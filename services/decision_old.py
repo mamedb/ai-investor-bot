@@ -1,16 +1,16 @@
 def make_decision(fundamental, technical, sentiment):
     score = 0
 
-    # Fundamental 2
+    # Fundamental 2 3
     score += fundamental["score"]
 
-    # Technical 2
+    # Technical 2 3
     if technical["signal"] == "bullish":
         score += 1
     elif technical["signal"] == "bearish":
         score -= 1
 
-    # Sentiment 2
+    # Sentiment 2 3
     if "positive" in sentiment.lower():
         score += 1
     elif "negative" in sentiment.lower():
