@@ -1,0 +1,274 @@
+nohup: ignoring input
+INFO:     Will watch for changes in these directories: ['/home/ec2-user/ai-investor']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [10669] using StatReload
+INFO:     Started server process [10671]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     185.146.112.5:23974 - "GET /analyze/TSLA HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59236 - "GET /analyze/TSLA HTTP/1.1" 200 OK
+WARNING:  StatReload detected changes in 'services/technical.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [10671]
+INFO:     Started server process [11167]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     185.146.112.5:23983 - "GET /analyze/TSLA HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60154 - "GET /analyze/TSLA HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33958 - "GET /analyze/NVDA HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39446 - "GET /analyze/QQQ HTTP/1.1" 200 OK
+$GLF: possibly delisted; no price data found  (period=6mo)
+INFO:     127.0.0.1:44112 - "GET /analyze/GLF HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/uvicorn/protocols/http/h11_impl.py", line 409, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/uvicorn/middleware/proxy_headers.py", line 60, in __call__
+    return await self.app(scope, receive, send)
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/fastapi/applications.py", line 1138, in __call__
+    await super().__call__(scope, receive, send)
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/starlette/applications.py", line 113, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/starlette/middleware/errors.py", line 186, in __call__
+    raise exc
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/fastapi/routing.py", line 121, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/fastapi/routing.py", line 107, in app
+    response = await f(request)
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/fastapi/routing.py", line 426, in app
+    raw_response = await run_endpoint_function(
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/fastapi/routing.py", line 316, in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/starlette/concurrency.py", line 38, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/anyio/to_thread.py", line 63, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/anyio/_backends/_asyncio.py", line 2502, in run_sync_in_worker_thread
+    return await future
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/anyio/_backends/_asyncio.py", line 986, in run
+    result = context.run(func, *args)
+  File "/home/ec2-user/ai-investor/app/main.py", line 15, in analyze_stock
+    technical = technical_analysis(data["price"])
+  File "/home/ec2-user/ai-investor/services/technical.py", line 8, in technical_analysis
+    latest = df.iloc[-1]
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/pandas/core/indexing.py", line 1192, in __getitem__
+    return self._getitem_axis(maybe_callable, axis=axis)
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/pandas/core/indexing.py", line 1753, in _getitem_axis
+    self._validate_integer(key, axis)
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/pandas/core/indexing.py", line 1686, in _validate_integer
+    raise IndexError("single positional indexer is out-of-bounds")
+IndexError: single positional indexer is out-of-bounds
+INFO:     127.0.0.1:44122 - "GET /analyze/GLD HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39184 - "GET /analyze/VOO HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35414 - "GET /analyze/URA HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56882 - "GET /analyze/BTC HTTP/1.1" 200 OK
+INFO:     127.0.0.1:32954 - "GET /analyze/VXUS HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39290 - "GET /analyze/VGT HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43238 - "GET /analyze/QQQM HTTP/1.1" 200 OK
+INFO:     67.213.118.179:45118 - "GET /api/run-casbin-command?language=exec&args=%5B%22enforce%22%2C%22-m%22%2C%22%5Brequest_definition%5D%5Cnr%20%3D%20sub%2C%20obj%2C%20act%5Cn%5Cn%5Bpolicy_definition%5D%5Cnp%20%3D%20sub%2C%20obj%2C%20act%5Cn%5Cn%5Brole_definition%5D%5Cng%20%3D%20_%2C%20_%5Cn%5Cn%5Bpolicy_effect%5D%5Cne%20%3D%20some(where%20(p.eft%20%3D%3D%20allow))%5Cn%5Cn%5Bmatchers%5D%5Cnm%20%3D%20r.sub%20%3D%3D%20p.sub%22%2C%22-p%22%2C%22p%2C%20x%2C%20x%2C%20x%22%2C%22sh%22%2C%22-c%22%2C%22id%22%5D&t=2026-03-30T16%3A12%3A50Z&m=1191e3dce3682e9382680387ffe783bb87cd213a48f4f1fa6c10644d039f4dc6 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51692 - "GET /analyze/BOTZ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58588 - "GET /analyze/WMT HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54302 - "GET /analyze/XOM HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56168 - "GET /analyze/JPM HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37594 - "GET /analyze/MU HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44270 - "GET /analyze/PLTR HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36152 - "GET /analyze/PG HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60050 - "GET /analyze/CSCO HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35320 - "GET /analyze/C HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35392 - "GET /analyze/IBM HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40150 - "GET /analyze/GEV HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37932 - "GET /analyze/UBER HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49870 - "GET /analyze/DELL HTTP/1.1" 200 OK
+HTTP Error 404: {"quoteSummary":{"result":null,"error":{"code":"Not Found","description":"Quote not found for symbol: NIKE"}}}
+$NIKE: possibly delisted; no price data found  (period=6mo) (Yahoo error = "No data found, symbol may be delisted")
+INFO:     127.0.0.1:38478 - "GET /analyze/NIKE HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/uvicorn/protocols/http/h11_impl.py", line 409, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/uvicorn/middleware/proxy_headers.py", line 60, in __call__
+    return await self.app(scope, receive, send)
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/fastapi/applications.py", line 1138, in __call__
+    await super().__call__(scope, receive, send)
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/starlette/applications.py", line 113, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/starlette/middleware/errors.py", line 186, in __call__
+    raise exc
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/fastapi/routing.py", line 121, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/fastapi/routing.py", line 107, in app
+    response = await f(request)
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/fastapi/routing.py", line 426, in app
+    raw_response = await run_endpoint_function(
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/fastapi/routing.py", line 316, in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/starlette/concurrency.py", line 38, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/anyio/to_thread.py", line 63, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/anyio/_backends/_asyncio.py", line 2502, in run_sync_in_worker_thread
+    return await future
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/anyio/_backends/_asyncio.py", line 986, in run
+    result = context.run(func, *args)
+  File "/home/ec2-user/ai-investor/app/main.py", line 15, in analyze_stock
+    technical = technical_analysis(data["price"])
+  File "/home/ec2-user/ai-investor/services/technical.py", line 8, in technical_analysis
+    latest = df.iloc[-1]
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/pandas/core/indexing.py", line 1192, in __getitem__
+    return self._getitem_axis(maybe_callable, axis=axis)
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/pandas/core/indexing.py", line 1753, in _getitem_axis
+    self._validate_integer(key, axis)
+  File "/home/ec2-user/venv/lib64/python3.9/site-packages/pandas/core/indexing.py", line 1686, in _validate_integer
+    raise IndexError("single positional indexer is out-of-bounds")
+IndexError: single positional indexer is out-of-bounds
+INFO:     127.0.0.1:54044 - "GET /analyze/NKE HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42858 - "GET /analyze/NET HTTP/1.1" 200 OK
+INFO:     67.213.118.179:60508 - "GET /api/run-casbin-command?language=go&args=%5B%22enforce%22%2C%22-m%22%2C%22%5Brequest_definition%5D%5Cnr%20%3D%20sub%2C%20obj%2C%20act%5Cn%5Cn%5Bpolicy_definition%5D%5Cnp%20%3D%20sub%2C%20obj%2C%20act%5Cn%5Cn%5Brole_definition%5D%5Cng%20%3D%20_%2C%20_%5Cn%5Cn%5Bpolicy_effect%5D%5Cne%20%3D%20some(where%20(p.eft%20%3D%3D%20allow))%5Cn%5Cn%5Bmatchers%5D%5Cnm%20%3D%20r.sub%20%3D%3D%20p.sub%22%2C%22-p%22%2C%22p%2C%20x%2C%20x%2C%20x%22%2C%22x%22%2C%22x%22%2C%22x%22%5D&t=2026-03-30T16%3A25%3A20Z&m=4eac7a684453f629d3d92d24a59269eddd6fb2ef03be2ff0b76730198ee174cb HTTP/1.1" 404 Not Found
+INFO:     67.213.118.179:60512 - "GET /api/get-all-objects?userId=built-in/admin HTTP/1.1" 404 Not Found
+INFO:     67.213.118.179:16458 - "GET /api/run-casbin-command?language=go&args=%5B%22enforce%22%2C%22-m%22%2C%22%5Brequest_definition%5D%5Cnr%20%3D%20sub%2C%20obj%2C%20act%5Cn%5Cn%5Bpolicy_definition%5D%5Cnp%20%3D%20sub%2C%20obj%2C%20act%5Cn%5Cn%5Brole_definition%5D%5Cng%20%3D%20_%2C%20_%5Cn%5Cn%5Bpolicy_effect%5D%5Cne%20%3D%20some(where%20(p.eft%20%3D%3D%20allow))%5Cn%5Cn%5Bmatchers%5D%5Cnm%20%3D%20r.sub%20%3D%3D%20p.sub%22%2C%22-p%22%2C%22p%2C%20x%2C%20x%2C%20x%22%2C%22x%22%2C%22x%22%2C%22x%22%5D&t=2026-03-30T16%3A28%3A31Z&m=527865e5feec73c7840b9ea0aa8894154effd33a5c364511cea520e0f06ba5ae HTTP/1.1" 404 Not Found
+INFO:     67.213.118.179:16460 - "GET /api/get-all-objects?userId=built-in/admin HTTP/1.1" 404 Not Found
+INFO:     67.213.118.179:24186 - "POST /api/upload-resource?owner=built-in&user=probe&fullFilePath=/probe/nuclei-check.txt&provider=provider_storage_built-in-1 HTTP/1.1" 404 Not Found
+INFO:     67.213.118.179:24198 - "POST /api/upload-resource?owner=built-in&user=probe&fullFilePath=/probe/nuclei-check.txt&provider=local HTTP/1.1" 404 Not Found
+INFO:     67.213.118.179:24202 - "POST /api/upload-resource?owner=built-in&user=probe&fullFilePath=/probe/nuclei-check.txt&provider=storage HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:35480 - "GET / HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:35488 - "GET / HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:35492 - "GET /.env HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:35494 - "GET /.env.local HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:35510 - "GET /.env.production HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:35518 - "GET /.env.development HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:35530 - "GET /.env.dev HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:35536 - "GET /.env.prod HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:35538 - "GET /.env.test HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:35554 - "GET /.env.staging HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:35568 - "GET /.env.backup HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:35570 - "GET /.env.save HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:35580 - "GET /.env.old HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:35588 - "GET /.env.bak HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:35602 - "GET /.env.tmp HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:35614 - "GET /.env.swp HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:35620 - "GET /.env~ HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:35632 - "GET /.env.example HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:35644 - "GET /.env.sample HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:35654 - "GET /.env.dist HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:35656 - "GET /.env.template HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:35668 - "GET /.env.production.local HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:35680 - "GET /.env.development.local HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:35694 - "GET /.env.test.local HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:35702 - "GET /.envrc HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:35710 - "GET /.flaskenv HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:35726 - "GET /env HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:35742 - "GET /env.js HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:35996 - "GET /env.json HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:36002 - "GET /app/.env HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:36016 - "GET /src/.env HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:36024 - "GET /config/.env HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:36036 - "GET /backend/.env HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:36044 - "GET /frontend/.env HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:36052 - "GET /api/.env HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:36062 - "GET /server/.env HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:36068 - "GET /client/.env HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:36070 - "GET /web/.env HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:36078 - "GET /public/.env HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:36086 - "GET /private/.env HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:36092 - "GET /var/.env HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:36102 - "GET /docker-compose.yml HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:36114 - "GET /docker-compose.yaml HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:36120 - "GET /docker-compose.override.yml HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:36130 - "GET /docker-compose.dev.yml HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:36136 - "GET /docker-compose.prod.yml HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:36142 - "GET /config.js HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:36152 - "GET /config.json HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:36162 - "GET /settings.js HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:36176 - "GET /settings.json HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:36188 - "GET /secrets.json HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:36198 - "GET /credentials.json HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:36206 - "GET /app.js HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:36218 - "GET /main.js HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:36228 - "GET /index.js HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:36244 - "GET /server.js HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:36246 - "GET /bundle.js HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:36254 - "GET /app.bundle.js HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:36268 - "GET /main.bundle.js HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53160 - "GET /vendor.js HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53172 - "GET /chunk.js HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53178 - "GET /static/js/main.js HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53184 - "GET /static/js/app.js HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53194 - "GET /static/js/bundle.js HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53206 - "GET /dist/main.js HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53222 - "GET /dist/app.js HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53226 - "GET /dist/bundle.js HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53234 - "GET /build/static/js/main.js HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53250 - "GET /assets/index.js HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53254 - "GET /assets/app.js HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53270 - "GET /_next/static/chunks/main.js HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53274 - "GET /_next/static/chunks/app.js HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53278 - "GET /js/app.js HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53282 - "GET /js/main.js HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53288 - "GET /settings.py HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53290 - "GET /config.py HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53294 - "GET /secrets.py HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53306 - "GET /config/secrets.yml HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53308 - "GET /config/master.key HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53312 - "GET /wp-config.php.bak HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53326 - "GET /wp-config.php.old HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53342 - "GET /wp-config.php.save HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53358 - "GET /wp-config.php.txt HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53372 - "GET /wp-config.php~ HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53380 - "GET /config/app.php HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53396 - "GET /application.properties HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53398 - "GET /application.yml HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53404 - "GET /application.yaml HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53414 - "GET /application-dev.properties HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53418 - "GET /application-prod.properties HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53424 - "GET /appsettings.json HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53430 - "GET /appsettings.Development.json HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53434 - "GET /appsettings.Production.json HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53436 - "GET /config.yaml HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53452 - "GET /config.yml HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53466 - "GET /config.toml HTTP/1.1" 404 Not Found
+INFO:     3.81.169.21:53480 - "GET /serverless.yml HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:34976 - "GET /analyze/AAPL HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58334 - "GET /analyze/VOO HTTP/1.1" 200 OK
+INFO:     127.0.0.1:32918 - "GET /analyze/NVDA HTTP/1.1" 200 OK
