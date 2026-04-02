@@ -1,11 +1,12 @@
 from fastapi import FastAPI
 from services.data_service import get_stock_data
-from services.fundamental import fundamental_analysis
-from services.technical import technical_analysis
+from services.fundamental_analysis import fundamental_analysis
+from services.technical_analysis import technical_analysis
 from services.sentiment import sentiment_analysis
-from services.decision import make_decision
+from services.decision_engine import make_decision
 
 app = FastAPI()
+
 
 @app.get("/analyze/{ticker}")
 def analyze_stock(ticker: str):
