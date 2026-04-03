@@ -7,6 +7,7 @@ from services.fundamental_analysis import analyze as fundamental_analysis
 from services.etf_analysis import analyze as etf_analysis
 from services.sentiment_analysis import analyze as sentiment_analysis
 from services.decision_engine import decide as make_decision
+from services.db_service import save_result, get_history
 import os
 
 app = FastAPI()
@@ -43,7 +44,7 @@ def analyze_stock(ticker: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analysis failed: {e}")
 
-    return {
+    result = {
         "ticker":      ticker.upper(),
         "asset_type":  "ETF" if is_etf else "STOCK",
         "technical":   technical,
@@ -51,3 +52,19 @@ def analyze_stock(ticker: str):
         "sentiment":   sentiment,
         "decision":    decision,
     }
+
+    save_result(
+        ticker=ticker.upper(),
+        asset_type=result["asset_type"],
+        technical=technical,
+        fundamental=fundamental,
+        sentiment=sentiment,
+        decision=decision,
+    )
+
+    return result
+
+
+@app.get("/history")
+def history(limit: int = 50):
+    return get_history(limit)

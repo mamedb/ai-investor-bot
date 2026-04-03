@@ -29,11 +29,13 @@
     .search {
       display: flex;
       gap: .5rem;
-      max-width: 480px;
+      max-width: 620px;
       margin: 0 auto 2.5rem;
+      flex-wrap: wrap;
     }
     .search input {
       flex: 1;
+      min-width: 120px;
       padding: .65rem 1rem;
       border-radius: 8px;
       border: 1px solid #334155;
@@ -45,6 +47,20 @@
       transition: border-color .2s;
     }
     .search input:focus { border-color: #38bdf8; }
+    .search select {
+      padding: .65rem .8rem;
+      border-radius: 8px;
+      border: 1px solid #334155;
+      background: #1e293b;
+      color: #94a3b8;
+      font-size: .88rem;
+      outline: none;
+      cursor: pointer;
+      transition: border-color .2s;
+      max-width: 220px;
+    }
+    .search select:focus { border-color: #38bdf8; }
+    .search select option { background: #1e293b; color: #f1f5f9; }
     .search button {
       padding: .65rem 1.4rem;
       border-radius: 8px;
@@ -195,6 +211,77 @@
     .conf-HIGH   { color: #38bdf8; }
     .conf-MEDIUM { color: #facc15; }
     .conf-LOW    { color: #94a3b8; }
+
+    /* ── History table ─────────────────────────────── */
+    #historySection {
+      max-width: 1100px;
+      margin: 3rem auto 0;
+    }
+    #historySection h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      margin-bottom: 1rem;
+    }
+    .hist-wrap {
+      overflow-x: auto;
+      border-radius: 12px;
+      border: 1px solid #334155;
+    }
+    table.hist {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .82rem;
+    }
+    table.hist thead tr {
+      background: #1e293b;
+    }
+    table.hist th {
+      padding: .6rem .9rem;
+      text-align: left;
+      color: #64748b;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      white-space: nowrap;
+      border-bottom: 1px solid #334155;
+    }
+    table.hist tbody tr {
+      border-bottom: 1px solid #1e293b;
+      transition: background .15s;
+    }
+    table.hist tbody tr:hover { background: #1e293b; }
+    table.hist tbody tr:last-child { border-bottom: none; }
+    table.hist td {
+      padding: .55rem .9rem;
+      color: #cbd5e1;
+      white-space: nowrap;
+    }
+    table.hist td.ticker-cell {
+      font-weight: 700;
+      color: #f1f5f9;
+      font-size: .9rem;
+    }
+    .rec-badge {
+      display: inline-block;
+      padding: .15rem .5rem;
+      border-radius: 4px;
+      font-weight: 700;
+      font-size: .78rem;
+      letter-spacing: .04em;
+    }
+    .rec-STRONG_BUY { background:#052e16; border:1px solid #16a34a; color:#4ade80; }
+    .rec-BUY        { background:#052e16; border:1px solid #4ade80; color:#86efac; }
+    .rec-HOLD       { background:#1c1917; border:1px solid #ca8a04; color:#fde047; }
+    .rec-AVOID      { background:#450a0a; border:1px solid #dc2626; color:#f87171; }
+    .hist-empty {
+      text-align: center;
+      padding: 2rem;
+      color: #475569;
+      font-size: .9rem;
+    }
   </style>
 </head>
 <body>
@@ -202,7 +289,10 @@
 <h1>AI <span>Investor</span></h1>
 
 <div class="search">
-  <input id="tickerInput" type="text" placeholder="Ticker (e.g. AAPL)" maxlength="10" />
+  <select id="topSelect" onchange="pickTop(this.value)">
+    <option value="">— Top 20 by Market Cap —</option>
+  </select>
+  <input id="tickerInput" type="text" placeholder="or type ticker…" maxlength="10" />
   <button id="analyzeBtn" onclick="analyze()">Analyze</button>
 </div>
 
@@ -264,8 +354,84 @@
   </div>
 </div>
 
+<!-- History -->
+<div id="historySection">
+  <h2>Search History</h2>
+  <div class="hist-wrap">
+    <table class="hist">
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Ticker</th>
+          <th>Type</th>
+          <th>Decision</th>
+          <th>Score</th>
+          <th>Conf</th>
+          <th>Tech</th>
+          <th>Fund</th>
+          <th>Sent</th>
+          <th>Price</th>
+          <th>Trend</th>
+          <th>RSI</th>
+          <th>52w %</th>
+          <th>Sector</th>
+          <th>P/E</th>
+          <th>D/E</th>
+          <th>Margin%</th>
+          <th>FCF $B</th>
+          <th>Sentiment</th>
+        </tr>
+      </thead>
+      <tbody id="historyBody">
+        <tr><td colspan="19" class="hist-empty">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
 <script>
   const $ = id => document.getElementById(id);
+
+  // ── Top 20 by market cap (hardcoded, updated ~Q1 2026) ────────────────────
+  const TOP20 = [
+    { ticker: 'AAPL',  name: 'Apple',               cap: '3.5T' },
+    { ticker: 'MSFT',  name: 'Microsoft',            cap: '3.0T' },
+    { ticker: 'NVDA',  name: 'NVIDIA',               cap: '2.8T' },
+    { ticker: 'AMZN',  name: 'Amazon',               cap: '2.3T' },
+    { ticker: 'GOOGL', name: 'Alphabet',             cap: '2.1T' },
+    { ticker: 'META',  name: 'Meta Platforms',       cap: '1.6T' },
+    { ticker: 'TSLA',  name: 'Tesla',                cap: '1.1T' },
+    { ticker: 'AVGO',  name: 'Broadcom',             cap: '1.0T' },
+    { ticker: 'BRK-B', name: 'Berkshire Hathaway',   cap: '1.0T' },
+    { ticker: 'TSM',   name: 'TSMC',                 cap: '0.9T' },
+    { ticker: 'WMT',   name: 'Walmart',              cap: '0.8T' },
+    { ticker: 'LLY',   name: 'Eli Lilly',            cap: '0.7T' },
+    { ticker: 'JPM',   name: 'JPMorgan Chase',       cap: '0.7T' },
+    { ticker: 'V',     name: 'Visa',                 cap: '0.6T' },
+    { ticker: 'UNH',   name: 'UnitedHealth',         cap: '0.5T' },
+    { ticker: 'ORCL',  name: 'Oracle',               cap: '0.5T' },
+    { ticker: 'XOM',   name: 'ExxonMobil',           cap: '0.5T' },
+    { ticker: 'MA',    name: 'Mastercard',           cap: '0.5T' },
+    { ticker: 'COST',  name: 'Costco',               cap: '0.4T' },
+    { ticker: 'NFLX',  name: 'Netflix',              cap: '0.4T' },
+  ];
+
+  (function buildDropdown() {
+    const sel = $('topSelect');
+    TOP20.forEach(({ ticker, name, cap }) => {
+      const opt = document.createElement('option');
+      opt.value = ticker;
+      opt.textContent = `${ticker} — ${name} ($${cap})`;
+      sel.appendChild(opt);
+    });
+  })();
+
+  function pickTop(ticker) {
+    if (!ticker) return;
+    $('tickerInput').value = ticker;
+    $('topSelect').value = '';   // reset dropdown so it reads as "choose again"
+    analyze();
+  }
 
   $('tickerInput').addEventListener('keydown', e => { if (e.key === 'Enter') analyze(); });
 
@@ -273,31 +439,6 @@
     const r = score / max;
     const cls = r >= 0.6 ? 'dot-green' : r >= 0.35 ? 'dot-yellow' : 'dot-red';
     return `<span class="dot ${cls}"></span>`;
-  }
-
-  function analyze() {
-    const ticker = $('tickerInput').value.trim().toUpperCase();
-    if (!ticker) return;
-
-    $('analyzeBtn').disabled = true;
-    $('spinner').classList.add('active');
-    $('errorBox').classList.remove('active');
-    $('results').classList.remove('active');
-
-    fetch(`/analyze/${ticker}`)
-      .then(r => r.json().then(d => ({ ok: r.ok, data: d })))
-      .then(({ ok, data }) => {
-        if (!ok) throw new Error(data.detail || 'Unknown error');
-        render(data);
-      })
-      .catch(err => {
-        $('errorBox').textContent = `Error: ${err.message}`;
-        $('errorBox').classList.add('active');
-      })
-      .finally(() => {
-        $('spinner').classList.remove('active');
-        $('analyzeBtn').disabled = false;
-      });
   }
 
   function render(d) {
@@ -397,6 +538,83 @@
     const map = { UPTREND: ['#86efac','↑ Uptrend'], DOWNTREND: ['#f87171','↓ Downtrend'], NEUTRAL: ['#facc15','→ Neutral'] };
     const [color, label] = map[trend] || ['#94a3b8', trend];
     return `<span style="color:${color};font-weight:600">${label}</span>`;
+  }
+
+  // ── History ───────────────────────────────────────
+  function loadHistory() {
+    fetch('/history?limit=50')
+      .then(r => r.json())
+      .then(rows => renderHistory(rows))
+      .catch(() => {});
+  }
+
+  function renderHistory(rows) {
+    const tbody = $('historyBody');
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="19" class="hist-empty">No searches yet.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(r => {
+      const dt = new Date(r.searched_at);
+      const time = dt.toLocaleString(undefined, { month:'short', day:'numeric',
+        hour:'2-digit', minute:'2-digit' });
+      const rec = r.recommendation || '—';
+      const sentColor = { BULLISH:'#4ade80', NEUTRAL:'#facc15', BEARISH:'#f87171' }[r.sent_label] || '#94a3b8';
+      const trendColor = { UPTREND:'#86efac', DOWNTREND:'#f87171', NEUTRAL:'#facc15' }[r.tech_trend] || '#94a3b8';
+      const confColor = { HIGH:'#38bdf8', MEDIUM:'#facc15', LOW:'#94a3b8' }[r.confidence] || '#94a3b8';
+      const w52pct = r.tech_week52_position != null ? Math.round(r.tech_week52_position * 100) + '%' : '—';
+
+      return `<tr>
+        <td style="color:#64748b">${time}</td>
+        <td class="ticker-cell">${r.ticker}</td>
+        <td style="color:#64748b">${r.asset_type || '—'}</td>
+        <td><span class="rec-badge rec-${rec}">${rec.replace('_',' ')}</span></td>
+        <td style="color:#f1f5f9;font-weight:700">${r.total_score ?? '—'}<span style="color:#475569">/18</span></td>
+        <td style="color:${confColor}">${r.confidence || '—'}</td>
+        <td>${r.tech_score ?? '—'}<span style="color:#475569">/5</span></td>
+        <td>${r.fund_score ?? '—'}<span style="color:#475569">/8</span></td>
+        <td>${r.sent_score ?? '—'}<span style="color:#475569">/5</span></td>
+        <td>$${r.tech_price != null ? Number(r.tech_price).toFixed(2) : '—'}</td>
+        <td style="color:${trendColor}">${r.tech_trend || '—'}</td>
+        <td>${r.tech_rsi != null ? Number(r.tech_rsi).toFixed(1) : '—'}</td>
+        <td>${w52pct}</td>
+        <td style="color:#64748b;max-width:120px;overflow:hidden;text-overflow:ellipsis">${r.fund_sector || '—'}</td>
+        <td>${r.fund_pe_value != null ? Number(r.fund_pe_value).toFixed(1) : '—'}</td>
+        <td>${r.fund_de_value != null ? Number(r.fund_de_value).toFixed(2) : '—'}</td>
+        <td>${r.fund_margin_value != null ? Number(r.fund_margin_value).toFixed(1) + '%' : '—'}</td>
+        <td>${r.fund_fcf_value != null ? '$' + Number(r.fund_fcf_value).toFixed(1) : '—'}</td>
+        <td style="color:${sentColor}">${r.sent_label || '—'}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  // load on page open, refresh after each analysis
+  loadHistory();
+
+  function analyze() {
+    const ticker = $('tickerInput').value.trim().toUpperCase();
+    if (!ticker) return;
+
+    $('analyzeBtn').disabled = true;
+    $('spinner').classList.add('active');
+    $('errorBox').classList.remove('active');
+    $('results').classList.remove('active');
+
+    fetch(`/analyze/${ticker}`)
+      .then(r => r.json().then(d => ({ ok: r.ok, data: d })))
+      .then(({ ok, data }) => {
+        if (!ok) throw new Error(data.detail || 'Unknown error');
+        render(data);
+      })
+      .catch(err => {
+        $('errorBox').textContent = `Error: ${err.message}`;
+        $('errorBox').classList.add('active');
+      })
+      .finally(() => {
+        $('spinner').classList.remove('active');
+        $('analyzeBtn').disabled = false;
+        loadHistory();
+      });
   }
 </script>
 </body>
