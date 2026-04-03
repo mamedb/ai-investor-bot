@@ -56,12 +56,26 @@ def get_stock_data(ticker: str) -> dict:
     except Exception:
         institutional = pd.DataFrame()
 
+    try:
+        raw_news = stock.news or []
+        news = [
+            {
+                "title":   item.get("content", {}).get("title", ""),
+                "summary": item.get("content", {}).get("summary", ""),
+            }
+            for item in raw_news
+            if item.get("content", {}).get("title")
+        ]
+    except Exception:
+        news = []
+
     return {
-        "daily_closes":        daily["Close"],
-        "weekly_closes":       weekly["Close"],
-        "info":                info,
-        "financials":          financials,
-        "cashflow":            cashflow,
-        "insider_transactions": insider,
+        "daily_closes":          daily["Close"],
+        "weekly_closes":         weekly["Close"],
+        "info":                  info,
+        "financials":            financials,
+        "cashflow":              cashflow,
+        "insider_transactions":  insider,
         "institutional_holders": institutional,
+        "news":                  news,
     }

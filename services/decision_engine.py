@@ -106,7 +106,14 @@ def _detect_flags(tech: dict, fund: dict, sent_score: int) -> list[str]:
     if margin.get("value") is not None and float(margin["value"]) < 0:
         flags.append("🔴 NEGATIVE_MARGIN")
 
-    if fund.get("grade") == "INSUFFICIENT_DATA":
+    if fund.get("is_etf", False):
+        er = breakdown.get("expense_ratio", {})
+        if er.get("score", 1) == 0 and er.get("value") is not None:
+            flags.append("💸 HIGH_EXPENSE_RATIO")
+        aum = breakdown.get("aum", {})
+        if aum.get("value") is not None and float(aum["value"]) < 0.1:
+            flags.append("⚠️ SMALL_AUM — риск ликвидности")
+    elif fund.get("grade") == "INSUFFICIENT_DATA":
         flags.append("ℹ️ LIMITED_FUND_DATA (ETF or data gap)")
 
     # Sentiment flags
@@ -131,11 +138,12 @@ def _check_veto(tech: dict, fund: dict) -> Optional[str]:
     if tech.get("trend") == "DOWNTREND" and fund_score < 4:
         return "Нисходящий тренд при слабом фундаментале"
 
-    # Hard veto 3: both FCF and EPS negative
-    fcf_neg = breakdown.get("free_cash_flow", {}).get("score", 1) == 0
-    eps_neg = breakdown.get("eps_trend", {}).get("score", 1) == 0
-    if fcf_neg and eps_neg and fund.get("grade") != "INSUFFICIENT_DATA":
-        return "Отрицательные FCF и EPS одновременно"
+    # Hard veto 3: both FCF and EPS negative (not applicable to ETFs)
+    if not fund.get("is_etf", False):
+        fcf_neg = breakdown.get("free_cash_flow", {}).get("score", 1) == 0
+        eps_neg = breakdown.get("eps_trend", {}).get("score", 1) == 0
+        if fcf_neg and eps_neg and fund.get("grade") != "INSUFFICIENT_DATA":
+            return "Отрицательные FCF и EPS одновременно"
 
     return None
 

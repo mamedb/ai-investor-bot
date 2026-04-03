@@ -233,13 +233,14 @@
 
     <!-- Fundamental -->
     <div class="card">
-      <h3>Fundamental</h3>
+      <h3 id="fundTitle">Fundamental</h3>
       <div class="score-line">
         <span class="big" id="fundScore">—</span>
         <span class="max">/ 8</span>
         <span class="max" id="fundGrade" style="margin-left:.4rem"></span>
       </div>
       <div class="bar-track"><div class="bar-fill" id="fundBar" style="width:0%"></div></div>
+      <div id="fundName" style="font-size:.8rem;color:#64748b;margin-bottom:.6rem"></div>
       <div id="fundRows"></div>
     </div>
 
@@ -330,21 +331,31 @@
     $('techW52').textContent   = `$${tech.week52_low}–$${tech.week52_high} | ${pos} (${tech.week52_signal})`;
 
     // ── Fundamental ──────────────────────────────────
+    $('fundTitle').textContent = d.asset_type === 'ETF' ? 'ETF Analysis' : 'Fundamental';
     $('fundScore').textContent = fund.score;
     $('fundGrade').textContent = fund.grade;
     $('fundBar').style.width   = `${fund.score / 8 * 100}%`;
-    const fundMap = {
-      revenue_growth: 'Revenue growth',
-      eps_trend:      'EPS trend',
-      pe_vs_sector:   'P/E vs sector',
-      debt_equity:    'Debt / Equity',
-      profit_margin:  'Profit margin',
-      free_cash_flow: 'Free cash flow',
-    };
-    $('fundRows').innerHTML = Object.entries(fundMap).map(([k, label]) => {
+    $('fundName').textContent  = fund.name ? `${fund.name}${fund.sector ? ' · ' + fund.sector : ''}` : '';
+    const fundMap = d.asset_type === 'ETF'
+      ? {
+          expense_ratio:  ['Expense ratio',  2],
+          aum:            ['AUM',            2],
+          return_1y:      ['1-year return',  2],
+          dividend_yield: ['Dividend yield', 1],
+          return_5y:      ['5-year return',  1],
+        }
+      : {
+          revenue_growth: ['Revenue growth', 2],
+          eps_trend:      ['EPS trend',      2],
+          pe_vs_sector:   ['P/E vs sector',  1],
+          debt_equity:    ['Debt / Equity',  1],
+          profit_margin:  ['Profit margin',  1],
+          free_cash_flow: ['Free cash flow', 1],
+        };
+    $('fundRows').innerHTML = Object.entries(fundMap).map(([k, [label, max]]) => {
       const c = (fund.breakdown || {})[k] || {};
       return `<div class="row">
-        <span class="label">${dot(c.score, 2)} ${label}</span>
+        <span class="label">${dot(c.score, max)} ${label}</span>
         <span class="val">${c.note || 'N/A'}</span>
       </div>`;
     }).join('');
@@ -353,14 +364,14 @@
     $('sentScore').textContent = sent.score;
     $('sentLabel').textContent = sent.label;
     $('sentBar').style.width   = `${sent.score / 5 * 100}%`;
-    const sentMap = {
-      analyst:       'Analysts',
-      insider:       'Insiders',
-      institutional: 'Institutional',
+    const sentLabelMap = {
+      news_sentiment:  'News Sentiment',
+      analyst_outlook: 'Analyst Outlook',
+      macro_context:   'Macro Context',
     };
-    $('sentRows').innerHTML = Object.entries(sentMap).map(([k, label]) => {
-      const c = (sent.breakdown || {})[k] || {};
-      const max = k === 'institutional' ? 1 : 2;
+    $('sentRows').innerHTML = Object.entries(sent.breakdown || {}).map(([k, c]) => {
+      const label = sentLabelMap[k] || k;
+      const max   = c.max ?? 2;
       return `<div class="row">
         <span class="label">${dot(c.score, max)} ${label}</span>
         <span class="val">${c.note || 'N/A'}</span>

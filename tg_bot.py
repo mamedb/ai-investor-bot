@@ -13,6 +13,11 @@ import requests
 import asyncio
 
 
+def _esc(value) -> str:
+    """Escape Telegram Markdown special characters in dynamic values."""
+    return str(value).replace("_", "\\_").replace("*", "\\*").replace("`", "\\`").replace("[", "\\[")
+
+
 def format_response(data: dict) -> str:
     # ── Decision ──────────────────────────────────────────────────────────────
     dec = data['decision']
@@ -49,21 +54,30 @@ def format_response(data: dict) -> str:
     fund_grade = fund.get('grade', '')
     breakdown = fund.get('breakdown', {})
 
-    def fmt_f(label, key):
+    def fmt_f(label, key, max_sc):
         c = breakdown.get(key, {})
         sc = c.get('score', 0)
-        note = c.get('note', 'N/A')
-        dot = "🟢" if sc >= 2 else "🟡" if sc == 1 else "🔴"
+        note = _esc(c.get('note', 'N/A'))
+        dot = "🟢" if sc >= max_sc else "🟡" if sc > 0 else "🔴"
         return f"  {dot} {label}: {note}"
 
-    fund_lines = "\n".join([
-        fmt_f("Выручка",  "revenue_growth"),
-        fmt_f("EPS",      "eps_trend"),
-        fmt_f("P/E",      "pe_vs_sector"),
-        fmt_f("Долг/Кап", "debt_equity"),
-        fmt_f("Маржа",    "profit_margin"),
-        fmt_f("FCF",      "free_cash_flow"),
-    ])
+    if data.get("asset_type") == "ETF":
+        fund_lines = "\n".join([
+            fmt_f("Комиссия",    "expense_ratio", 2),
+            fmt_f("AUM",         "aum",           2),
+            fmt_f("Доход 1 год", "return_1y",     2),
+            fmt_f("Дивиденды",   "dividend_yield",1),
+            fmt_f("Доход 5 лет", "return_5y",     1),
+        ])
+    else:
+        fund_lines = "\n".join([
+            fmt_f("Выручка",  "revenue_growth", 2),
+            fmt_f("EPS",      "eps_trend",      2),
+            fmt_f("P/E",      "pe_vs_sector",   1),
+            fmt_f("Долг/Кап", "debt_equity",    1),
+            fmt_f("Маржа",    "profit_margin",  1),
+            fmt_f("FCF",      "free_cash_flow", 1),
+        ])
 
     # ── Sentiment ────────────────────────────────────────────────────────────
     sent = data.get('sentiment', {})
@@ -75,38 +89,42 @@ def format_response(data: dict) -> str:
     def fmt_s(label, key):
         c = sent_bd.get(key, {})
         sc = c.get('score', 0)
-        note = c.get('note', 'N/A')
-        max_sc = 2 if key != 'institutional' else 1
+        note = _esc(c.get('note', 'N/A'))
+        max_sc = c.get('max', 2)
         dot = "🟢" if sc >= max_sc else "🟡" if sc > 0 else "🔴"
         return f"  {dot} {label}: {note}"
 
-    sent_lines = "\n".join([
-        fmt_s("Аналитики",     "analyst"),
-        fmt_s("Инсайдеры",     "insider"),
-        fmt_s("Институционалы", "institutional"),
-    ])
+    _sent_label_map = {
+        'news_sentiment':  'Новости',
+        'analyst_outlook': 'Аналитики',
+        'macro_context':   'Макро',
+    }
+    sent_lines = "\n".join(
+        fmt_s(_sent_label_map.get(k, k), k)
+        for k in sent_bd
+    )
 
     # ── Flags ─────────────────────────────────────────────────────────────────
     flags_block = ""
     if flags:
         flags_block = "━━━━━━━━━━━━━━━\n⚑ *Флаги:*\n" + \
-            "\n".join(f"  {f}" for f in flags) + "\n"
+            "\n".join(f"  {_esc(f)}" for f in flags) + "\n"
 
     total_max = 5 + 8 + 5
 
     text = (
-        f"{emoji} *{decision}* {conf_emoji} уверенность: {confidence}\n"
-        f"📊 Итог: {score}/{total_max} | {reason}\n"
+        f"{emoji} *{_esc(decision)}* {conf_emoji} уверенность: {_esc(confidence)}\n"
+        f"📊 Итог: {_esc(score)}/{total_max} | {_esc(reason)}\n"
         f"━━━━━━━━━━━━━━━\n"
-        f"📈 *Техника* ({tech_sc}/5)\n"
-        f"  • Тренд: {trend} (цена {price} / SMA200 {sma200})\n"
-        f"  • RSI weekly: {rsi} — {signal}\n"
-        f"  • 52w: {w52_lo}–{w52_hi} | {w52_pct} ({w52_sig})\n"
+        f"📈 *Техника* ({_esc(tech_sc)}/5)\n"
+        f"  • Тренд: {_esc(trend)} (цена {_esc(price)} / SMA200 {_esc(sma200)})\n"
+        f"  • RSI weekly: {_esc(rsi)} — {_esc(signal)}\n"
+        f"  • 52w: {_esc(w52_lo)}–{_esc(w52_hi)} | {_esc(w52_pct)} ({_esc(w52_sig)})\n"
         f"━━━━━━━━━━━━━━━\n"
-        f"🏦 *Фундаментал* ({fund_sc}/8 — {fund_grade})\n"
+        f"{'📦 *ETF анализ*' if data.get('asset_type') == 'ETF' else '🏦 *Фундаментал*'} ({_esc(fund_sc)}/8 — {_esc(fund_grade)})\n"
         f"{fund_lines}\n"
         f"━━━━━━━━━━━━━━━\n"
-        f"📰 *Сентимент* ({sent_sc}/5 — {sent_lbl})\n"
+        f"📰 *Сентимент* ({_esc(sent_sc)}/5 — {_esc(sent_lbl)})\n"
         f"{sent_lines}\n"
         f"{flags_block}"
     )
