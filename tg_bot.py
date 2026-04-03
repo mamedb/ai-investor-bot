@@ -14,6 +14,7 @@ import asyncio
 
 
 def format_response(data: dict) -> str:
+    # ── Decision ──────────────────────────────────────────────────────────────
     dec = data['decision']
     decision = dec['decision']
     score = dec['score']
@@ -21,6 +22,11 @@ def format_response(data: dict) -> str:
     reason = dec.get('reason', '')
     flags = dec.get('flags', [])
     pillars = dec.get('pillar_scores', {})
+
+    emoji_map = {"STRONG_BUY": "🚀", "BUY": "✅", "HOLD": "⚖️", "AVOID": "🚫"}
+    conf_map = {"HIGH": "🔵", "MEDIUM": "🟡", "LOW": "⚪"}
+    emoji = emoji_map.get(decision, "❓")
+    conf_emoji = conf_map.get(confidence, "⚪")
 
     # ── Technical ────────────────────────────────────────────────────────────
     tech = data['technical']
@@ -33,18 +39,17 @@ def format_response(data: dict) -> str:
     w52_sig = tech.get('week52_signal', 'N/A')
     w52_hi = tech.get('week52_high', 'N/A')
     w52_lo = tech.get('week52_low', 'N/A')
-    tech_sc = pillars.get('technical', {}).get(
-        'score', tech.get('score', 'N/A'))
+    tech_sc = pillars.get('technical', {}).get('score', tech.get('score', '?'))
     w52_pct = f"{round(w52_pos * 100)}%" if w52_pos is not None else "N/A"
 
     # ── Fundamental ──────────────────────────────────────────────────────────
     fund = data['fundamental']
     fund_sc = pillars.get('fundamental', {}).get(
-        'score', fund.get('score', 'N/A'))
+        'score', fund.get('score', '?'))
     fund_grade = fund.get('grade', '')
     breakdown = fund.get('breakdown', {})
 
-    def fmt_criterion(label, key):
+    def fmt_f(label, key):
         c = breakdown.get(key, {})
         sc = c.get('score', 0)
         note = c.get('note', 'N/A')
@@ -52,62 +57,60 @@ def format_response(data: dict) -> str:
         return f"  {dot} {label}: {note}"
 
     fund_lines = "\n".join([
-        fmt_criterion("Выручка",   "revenue_growth"),
-        fmt_criterion("EPS",       "eps_trend"),
-        fmt_criterion("P/E",       "pe_vs_sector"),
-        fmt_criterion("Долг/Кап",  "debt_equity"),
-        fmt_criterion("Маржа",     "profit_margin"),
-        fmt_criterion("FCF",       "free_cash_flow"),
+        fmt_f("Выручка",  "revenue_growth"),
+        fmt_f("EPS",      "eps_trend"),
+        fmt_f("P/E",      "pe_vs_sector"),
+        fmt_f("Долг/Кап", "debt_equity"),
+        fmt_f("Маржа",    "profit_margin"),
+        fmt_f("FCF",      "free_cash_flow"),
     ])
 
     # ── Sentiment ────────────────────────────────────────────────────────────
-    sent_raw = data.get('sentiment', {})
-    if isinstance(sent_raw, dict):
-        sent_label = sent_raw.get('label', 'N/A')
-        sent_sc = sent_raw.get('score', 'N/A')
-    else:
-        sent_label = str(sent_raw)
-        sent_sc = pillars.get('sentiment', {}).get('score', 'N/A')
+    sent = data.get('sentiment', {})
+    sent_sc = pillars.get('sentiment', {}).get('score', sent.get('score', '?'))
+    sent_lbl = sent.get('label', 'N/A') if isinstance(sent,
+                                                      dict) else str(sent)
+    sent_bd = sent.get('breakdown', {}) if isinstance(sent, dict) else {}
 
-    # ── Decision header ───────────────────────────────────────────────────────
-    emoji_map = {
-        "STRONG_BUY": "🚀",
-        "BUY":        "✅",
-        "HOLD":       "⚖️",
-        "AVOID":      "🚫",
-    }
-    conf_map = {"HIGH": "🔵", "MEDIUM": "🟡", "LOW": "⚪"}
-    emoji = emoji_map.get(decision, "❓")
-    conf_emoji = conf_map.get(confidence, "⚪")
+    def fmt_s(label, key):
+        c = sent_bd.get(key, {})
+        sc = c.get('score', 0)
+        note = c.get('note', 'N/A')
+        max_sc = 2 if key != 'institutional' else 1
+        dot = "🟢" if sc >= max_sc else "🟡" if sc > 0 else "🔴"
+        return f"  {dot} {label}: {note}"
 
-    total_max = 5 + 8 + 5  # tech + fund + sent
+    sent_lines = "\n".join([
+        fmt_s("Аналитики",     "analyst"),
+        fmt_s("Инсайдеры",     "insider"),
+        fmt_s("Институционалы", "institutional"),
+    ])
 
-    # ── Flags block ───────────────────────────────────────────────────────────
+    # ── Flags ─────────────────────────────────────────────────────────────────
     flags_block = ""
     if flags:
-        flags_block = "⚑ *Флаги:*\n" + \
+        flags_block = "━━━━━━━━━━━━━━━\n⚑ *Флаги:*\n" + \
             "\n".join(f"  {f}" for f in flags) + "\n"
+
+    total_max = 5 + 8 + 5
 
     text = (
         f"{emoji} *{decision}* {conf_emoji} уверенность: {confidence}\n"
-        f"📊 Итог: {score}/{total_max} | Причина: {reason}\n"
+        f"📊 Итог: {score}/{total_max} | {reason}\n"
         f"━━━━━━━━━━━━━━━\n"
         f"📈 *Техника* ({tech_sc}/5)\n"
         f"  • Тренд: {trend} (цена {price} / SMA200 {sma200})\n"
-        f"  • RSI (weekly): {rsi} — {signal}\n"
+        f"  • RSI weekly: {rsi} — {signal}\n"
         f"  • 52w: {w52_lo}–{w52_hi} | {w52_pct} ({w52_sig})\n"
         f"━━━━━━━━━━━━━━━\n"
         f"🏦 *Фундаментал* ({fund_sc}/8 — {fund_grade})\n"
         f"{fund_lines}\n"
         f"━━━━━━━━━━━━━━━\n"
-        f"📰 *Сентимент* ({sent_sc}/5): {sent_label}\n"
+        f"📰 *Сентимент* ({sent_sc}/5 — {sent_lbl})\n"
+        f"{sent_lines}\n"
+        f"{flags_block}"
     )
-
-    if flags_block:
-        text += f"━━━━━━━━━━━━━━━\n{flags_block}"
-
     return text
-
 
 # ── updated handle_message ────────────────────────────────────────────────────
 
