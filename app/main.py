@@ -32,3 +32,4 @@ def analyze_stock(ticker: str):
         "fundamental": fundamental,
         "sentiment":   sentiment,
         "decision":    decision,
+    }
