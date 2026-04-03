@@ -1,26 +1,34 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from services.data_service import get_stock_data
-from services.fundamental import fundamental_analysis
-from services.technical import technical_analysis
-from services.sentiment import sentiment_analysis
-from services.decision import make_decision
+from services.technical_analysis import analyze as technical_analysis
+from services.fundamental_analysis import analyze as fundamental_analysis
+from services.sentiment_analysis import analyze as sentiment_analysis
+from services.decision_engine import decide as make_decision
 
 app = FastAPI()
 
+
 @app.get("/analyze/{ticker}")
 def analyze_stock(ticker: str):
-    data = get_stock_data(ticker)
+    # single yfinance fetch — shared across all modules
+    try:
+        data = get_stock_data(ticker.upper())
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Data fetch failed: {e}")
 
-    fundamental = fundamental_analysis(data["info"])
-    technical = technical_analysis(data["price"])
-    sentiment = sentiment_analysis(ticker)
-
-    decision = make_decision(fundamental, technical, sentiment)
+    try:
+        technical = technical_analysis(data)
+        fundamental = fundamental_analysis(data)
+        sentiment = sentiment_analysis(data)
+        decision = make_decision(technical, fundamental, sentiment)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {e}")
 
     return {
-        "ticker": ticker,
+        "ticker":      ticker.upper(),
+        "technical":   technical,
         "fundamental": fundamental,
-        "technical": technical,
-        "sentiment": sentiment,
-        "decision": decision
-    }
+        "sentiment":   sentiment,
+        "decision":    decision,
