@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Investor</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 1.8rem;
+      font-weight: 700;
+      letter-spacing: .04em;
+      margin-bottom: 2rem;
+      color: #f8fafc;
+    }
+    h1 span { color: #38bdf8; }
+
+    /* ── Search bar ─────────────────────────────────── */
+    .search {
+      display: flex;
+      gap: .5rem;
+      max-width: 480px;
+      margin: 0 auto 2.5rem;
+    }
+    .search input {
+      flex: 1;
+      padding: .65rem 1rem;
+      border-radius: 8px;
+      border: 1px solid #334155;
+      background: #1e293b;
+      color: #f1f5f9;
+      font-size: 1rem;
+      text-transform: uppercase;
+      outline: none;
+      transition: border-color .2s;
+    }
+    .search input:focus { border-color: #38bdf8; }
+    .search button {
+      padding: .65rem 1.4rem;
+      border-radius: 8px;
+      border: none;
+      background: #0ea5e9;
+      color: #fff;
+      font-size: .95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    .search button:hover { background: #38bdf8; }
+    .search button:disabled { background: #334155; cursor: not-allowed; }
+
+    /* ── Spinner ────────────────────────────────────── */
+    .spinner {
+      display: none;
+      text-align: center;
+      margin: 2rem 0;
+      color: #94a3b8;
+      font-size: .9rem;
+    }
+    .spinner.active { display: block; }
+    .spinner::before {
+      content: '';
+      display: inline-block;
+      width: 28px; height: 28px;
+      border: 3px solid #334155;
+      border-top-color: #38bdf8;
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+      vertical-align: middle;
+      margin-right: .6rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Error ──────────────────────────────────────── */
+    .error {
+      display: none;
+      max-width: 600px;
+      margin: 0 auto 1.5rem;
+      padding: .8rem 1rem;
+      border-radius: 8px;
+      background: #450a0a;
+      border: 1px solid #7f1d1d;
+      color: #fca5a5;
+      font-size: .9rem;
+    }
+    .error.active { display: block; }
+
+    /* ── Results grid ───────────────────────────────── */
+    #results { display: none; max-width: 860px; margin: 0 auto; }
+    #results.active { display: block; }
+
+    .decision-banner {
+      border-radius: 12px;
+      padding: 1.4rem 1.6rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1.2rem;
+      flex-wrap: wrap;
+    }
+    .decision-banner .verdict {
+      font-size: 1.6rem;
+      font-weight: 800;
+      letter-spacing: .06em;
+    }
+    .decision-banner .meta { font-size: .9rem; color: #cbd5e1; flex: 1; }
+    .decision-banner .meta b { color: #f1f5f9; }
+
+    .bg-strong-buy { background: #052e16; border: 1px solid #16a34a; }
+    .bg-buy        { background: #052e16; border: 1px solid #4ade80; }
+    .bg-hold       { background: #1c1917; border: 1px solid #ca8a04; }
+    .bg-avoid      { background: #450a0a; border: 1px solid #dc2626; }
+
+    .col-strong-buy { color: #4ade80; }
+    .col-buy        { color: #86efac; }
+    .col-hold       { color: #fde047; }
+    .col-avoid      { color: #f87171; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 1.2rem 1.4rem;
+    }
+    .card h3 {
+      font-size: .75rem;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: #64748b;
+      margin-bottom: .8rem;
+    }
+    .card .score-line {
+      display: flex;
+      align-items: baseline;
+      gap: .4rem;
+      margin-bottom: .9rem;
+    }
+    .card .score-line .big { font-size: 2rem; font-weight: 700; color: #f1f5f9; }
+    .card .score-line .max { font-size: .9rem; color: #64748b; }
+
+    .bar-track {
+      height: 6px;
+      border-radius: 3px;
+      background: #334155;
+      margin-bottom: 1rem;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      background: #38bdf8;
+      transition: width .6s ease;
+    }
+
+    .row { display: flex; justify-content: space-between; padding: .28rem 0; font-size: .87rem; border-bottom: 1px solid #1e293b; }
+    .row:last-child { border-bottom: none; }
+    .row .label { color: #94a3b8; }
+    .row .val { color: #e2e8f0; font-weight: 500; }
+
+    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
+    .dot-green  { background: #4ade80; }
+    .dot-yellow { background: #facc15; }
+    .dot-red    { background: #f87171; }
+
+    .flags { margin-top: .8rem; }
+    .flag-item {
+      display: inline-block;
+      padding: .2rem .6rem;
+      border-radius: 4px;
+      font-size: .78rem;
+      margin: .2rem .2rem 0 0;
+      background: #451a03;
+      border: 1px solid #92400e;
+      color: #fcd34d;
+    }
+    .flag-item.flag-down { background: #450a0a; border-color: #991b1b; color: #fca5a5; }
+
+    .conf-HIGH   { color: #38bdf8; }
+    .conf-MEDIUM { color: #facc15; }
+    .conf-LOW    { color: #94a3b8; }
+  </style>
+</head>
+<body>
+
+<h1>AI <span>Investor</span></h1>
+
+<div class="search">
+  <input id="tickerInput" type="text" placeholder="Ticker (e.g. AAPL)" maxlength="10" />
+  <button id="analyzeBtn" onclick="analyze()">Analyze</button>
+</div>
+
+<div class="spinner" id="spinner">Fetching data…</div>
+<div class="error"  id="errorBox"></div>
+
+<div id="results">
+  <div class="decision-banner" id="banner">
+    <div class="verdict" id="verdictText"></div>
+    <div class="meta" id="metaText"></div>
+  </div>
+
+  <div class="grid">
+    <!-- Technical -->
+    <div class="card">
+      <h3>Technical</h3>
+      <div class="score-line">
+        <span class="big" id="techScore">—</span>
+        <span class="max">/ 5</span>
+      </div>
+      <div class="bar-track"><div class="bar-fill" id="techBar" style="width:0%"></div></div>
+      <div class="row"><span class="label">Trend</span>      <span class="val" id="techTrend">—</span></div>
+      <div class="row"><span class="label">Price</span>      <span class="val" id="techPrice">—</span></div>
+      <div class="row"><span class="label">SMA 200</span>    <span class="val" id="techSma">—</span></div>
+      <div class="row"><span class="label">RSI (weekly)</span><span class="val" id="techRsi">—</span></div>
+      <div class="row"><span class="label">52w range</span>  <span class="val" id="techW52">—</span></div>
+    </div>
+
+    <!-- Fundamental -->
+    <div class="card">
+      <h3>Fundamental</h3>
+      <div class="score-line">
+        <span class="big" id="fundScore">—</span>
+        <span class="max">/ 8</span>
+        <span class="max" id="fundGrade" style="margin-left:.4rem"></span>
+      </div>
+      <div class="bar-track"><div class="bar-fill" id="fundBar" style="width:0%"></div></div>
+      <div id="fundRows"></div>
+    </div>
+
+    <!-- Sentiment -->
+    <div class="card">
+      <h3>Sentiment</h3>
+      <div class="score-line">
+        <span class="big" id="sentScore">—</span>
+        <span class="max">/ 5</span>
+        <span class="max" id="sentLabel" style="margin-left:.4rem"></span>
+      </div>
+      <div class="bar-track"><div class="bar-fill" id="sentBar" style="width:0%"></div></div>
+      <div id="sentRows"></div>
+    </div>
+  </div>
+
+  <!-- Flags -->
+  <div class="card flags" id="flagsCard" style="display:none">
+    <h3>Flags</h3>
+    <div id="flagsList"></div>
+  </div>
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+
+  $('tickerInput').addEventListener('keydown', e => { if (e.key === 'Enter') analyze(); });
+
+  function dot(score, max) {
+    const r = score / max;
+    const cls = r >= 0.6 ? 'dot-green' : r >= 0.35 ? 'dot-yellow' : 'dot-red';
+    return `<span class="dot ${cls}"></span>`;
+  }
+
+  function analyze() {
+    const ticker = $('tickerInput').value.trim().toUpperCase();
+    if (!ticker) return;
+
+    $('analyzeBtn').disabled = true;
+    $('spinner').classList.add('active');
+    $('errorBox').classList.remove('active');
+    $('results').classList.remove('active');
+
+    fetch(`/analyze/${ticker}`)
+      .then(r => r.json().then(d => ({ ok: r.ok, data: d })))
+      .then(({ ok, data }) => {
+        if (!ok) throw new Error(data.detail || 'Unknown error');
+        render(data);
+      })
+      .catch(err => {
+        $('errorBox').textContent = `Error: ${err.message}`;
+        $('errorBox').classList.add('active');
+      })
+      .finally(() => {
+        $('spinner').classList.remove('active');
+        $('analyzeBtn').disabled = false;
+      });
+  }
+
+  function render(d) {
+    const dec   = d.decision;
+    const tech  = d.technical;
+    const fund  = d.fundamental;
+    const sent  = d.sentiment;
+
+    // ── Decision banner ──────────────────────────────
+    const decClass = { STRONG_BUY: 'strong-buy', BUY: 'buy', HOLD: 'hold', AVOID: 'avoid' }[dec.decision] || 'hold';
+    const banner = $('banner');
+    banner.className = `decision-banner bg-${decClass.replace('_','-').toLowerCase()}`;
+    $('verdictText').className = `verdict col-${decClass.replace('_','-').toLowerCase()}`;
+    $('verdictText').textContent = dec.decision.replace('_', ' ');
+
+    const pillars = dec.pillar_scores || {};
+    const total   = pillars.total || {};
+    $('metaText').innerHTML =
+      `Score <b>${total.score ?? dec.score} / ${total.max ?? 18}</b> &nbsp;·&nbsp; ` +
+      `Confidence <b class="conf-${dec.confidence}">${dec.confidence}</b><br>` +
+      `<span style="color:#94a3b8">${dec.reason}</span>`;
+
+    // ── Technical ────────────────────────────────────
+    $('techScore').textContent = tech.score;
+    $('techBar').style.width   = `${tech.score / 5 * 100}%`;
+    $('techTrend').innerHTML   = trendBadge(tech.trend);
+    $('techPrice').textContent = `$${tech.price}`;
+    $('techSma').textContent   = tech.sma200 ? `$${tech.sma200}` : 'N/A';
+    $('techRsi').textContent   = `${tech.rsi} (${tech.signal})`;
+    const pos = tech.week52_position != null ? `${Math.round(tech.week52_position * 100)}%` : 'N/A';
+    $('techW52').textContent   = `$${tech.week52_low}–$${tech.week52_high} | ${pos} (${tech.week52_signal})`;
+
+    // ── Fundamental ──────────────────────────────────
+    $('fundScore').textContent = fund.score;
+    $('fundGrade').textContent = fund.grade;
+    $('fundBar').style.width   = `${fund.score / 8 * 100}%`;
+    const fundMap = {
+      revenue_growth: 'Revenue growth',
+      eps_trend:      'EPS trend',
+      pe_vs_sector:   'P/E vs sector',
+      debt_equity:    'Debt / Equity',
+      profit_margin:  'Profit margin',
+      free_cash_flow: 'Free cash flow',
+    };
+    $('fundRows').innerHTML = Object.entries(fundMap).map(([k, label]) => {
+      const c = (fund.breakdown || {})[k] || {};
+      return `<div class="row">
+        <span class="label">${dot(c.score, 2)} ${label}</span>
+        <span class="val">${c.note || 'N/A'}</span>
+      </div>`;
+    }).join('');
+
+    // ── Sentiment ────────────────────────────────────
+    $('sentScore').textContent = sent.score;
+    $('sentLabel').textContent = sent.label;
+    $('sentBar').style.width   = `${sent.score / 5 * 100}%`;
+    const sentMap = {
+      analyst:       'Analysts',
+      insider:       'Insiders',
+      institutional: 'Institutional',
+    };
+    $('sentRows').innerHTML = Object.entries(sentMap).map(([k, label]) => {
+      const c = (sent.breakdown || {})[k] || {};
+      const max = k === 'institutional' ? 1 : 2;
+      return `<div class="row">
+        <span class="label">${dot(c.score, max)} ${label}</span>
+        <span class="val">${c.note || 'N/A'}</span>
+      </div>`;
+    }).join('');
+
+    // ── Flags ─────────────────────────────────────────
+    const flags = dec.flags || [];
+    if (flags.length) {
+      $('flagsCard').style.display = '';
+      $('flagsList').innerHTML = flags.map(f => {
+        const danger = f.includes('DOWNTREND') || f.includes('NEGATIVE') || f.includes('Veto');
+        return `<span class="flag-item ${danger ? 'flag-down' : ''}">${f}</span>`;
+      }).join('');
+    } else {
+      $('flagsCard').style.display = 'none';
+    }
+
+    $('results').classList.add('active');
+  }
+
+  function trendBadge(trend) {
+    const map = { UPTREND: ['#86efac','↑ Uptrend'], DOWNTREND: ['#f87171','↓ Downtrend'], NEUTRAL: ['#facc15','→ Neutral'] };
+    const [color, label] = map[trend] || ['#94a3b8', trend];
+    return `<span style="color:${color};font-weight:600">${label}</span>`;
+  }
+</script>
+</body>
+</html>
