@@ -18,7 +18,6 @@ Returns:
   }
 """
 
-import yfinance as yf
 import pandas as pd
 from datetime import datetime, timedelta
 
@@ -81,17 +80,12 @@ def _analyst_consensus(info: dict) -> dict:
 # Buys by insiders = strong long-term conviction signal.
 # Sales are less meaningful (insiders sell for many reasons).
 
-def _insider_transactions(ticker_obj) -> dict:
+def _insider_transactions(txns) -> dict:
     """
     2 pts: net insider buying (buys > sells in last 6mo)
     1 pt:  neutral (minimal activity or balanced)
     0 pts: net insider selling
     """
-    try:
-        txns = ticker_obj.insider_transactions
-    except Exception:
-        txns = None
-
     if txns is None or txns.empty:
         return {"score": 1, "value": None, "note": "Нет данных по инсайдерам"}
 
@@ -139,7 +133,7 @@ def _insider_transactions(ticker_obj) -> dict:
 # their positions. yfinance provides a snapshot — we use pctHeld
 # as a proxy for institutional conviction.
 
-def _institutional_ownership(info: dict, ticker_obj) -> dict:
+def _institutional_ownership(info: dict, institutional_holders) -> dict:
     """
     1 pt:  institutional ownership ≥ 60% (high smart-money conviction)
             OR top holder count increasing (if data available)
@@ -150,7 +144,7 @@ def _institutional_ownership(info: dict, ticker_obj) -> dict:
     # fallback: compute from institutional_holders table
     if pct_held is None:
         try:
-            holders = ticker_obj.institutional_holders
+            holders = institutional_holders
             if holders is not None and not holders.empty and "% Out" in holders.columns:
                 pct_held = float(holders["% Out"].iloc[0]) / 100
         except Exception:
@@ -182,21 +176,16 @@ def _score_to_label(score: int) -> str:
 
 # ── MAIN ENTRY POINT ──────────────────────────────────────────────────────────
 
-def analyze(ticker: str) -> dict:
+def analyze(data: dict) -> dict:
     """
-    Run full sentiment analysis for a ticker.
+    Run full sentiment analysis using pre-fetched data.
     Never raises — returns partial data with score=0 if sources fail.
     """
-    t = yf.Ticker(ticker)
-
-    try:
-        info = t.info or {}
-    except Exception:
-        info = {}
+    info = data.get("info") or {}
 
     analyst = _analyst_consensus(info)
-    insider = _insider_transactions(t)
-    inst = _institutional_ownership(info, t)
+    insider = _insider_transactions(data.get("insider_transactions"))
+    inst = _institutional_ownership(info, data.get("institutional_holders"))
 
     total = analyst["score"] + insider["score"] + inst["score"]
     total = max(0, min(5, total))

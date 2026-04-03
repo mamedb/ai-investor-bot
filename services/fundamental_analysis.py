@@ -23,7 +23,6 @@ Returns:
   }
 """
 
-import yfinance as yf
 import numpy as np
 
 
@@ -233,26 +232,16 @@ def _free_cash_flow(info: dict, cashflow) -> dict:
 
 # ── MAIN ENTRY POINT ──────────────────────────────────────────────────────────
 
-def analyze(ticker: str) -> dict:
+def analyze(data: dict) -> dict:
     """
-    Run full 8-point fundamental analysis.
-    Raises ValueError if data cannot be fetched.
+    Run full 8-point fundamental analysis using pre-fetched data.
     """
-    t = yf.Ticker(ticker)
+    info = data["info"]
+    financials = data.get("financials")
+    cashflow = data.get("cashflow")
 
-    info = t.info
-    if not info or info.get("regularMarketPrice") is None:
-        raise ValueError(f"No fundamental data available for {ticker}")
-
-    try:
-        financials = t.financials          # annual income statement
-    except Exception:
-        financials = None
-
-    try:
-        cashflow = t.cashflow
-    except Exception:
-        cashflow = None
+    if not info:
+        raise ValueError("No fundamental data available")
 
     # --- run each criterion ---
     rev = _revenue_growth(info, financials)

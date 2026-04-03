@@ -19,7 +19,6 @@ Returns a dict that is backward-compatible with the existing API response:
   }
 """
 
-import yfinance as yf
 import pandas as pd
 
 
@@ -132,26 +131,19 @@ def _week52_analysis(daily_closes: pd.Series) -> dict:
 
 # ── MAIN ENTRY POINT ──────────────────────────────────────────────────────────
 
-def analyze(ticker: str) -> dict:
+def analyze(data: dict) -> dict:
     """
-    Run full long-term technical analysis for a ticker.
-    Raises ValueError if data cannot be fetched.
+    Run full long-term technical analysis using pre-fetched data.
+    Raises ValueError if data is insufficient.
     """
-    t = yf.Ticker(ticker)
+    weekly_closes = data["weekly_closes"]
+    daily_closes = data["daily_closes"]
 
-    # --- fetch weekly data for RSI (2 years gives ~104 weekly bars) ---
-    weekly = t.history(period="2y", interval="1wk")
-    if weekly.empty or len(weekly) < 20:
-        raise ValueError(f"Insufficient weekly data for {ticker}")
+    if weekly_closes.empty or len(weekly_closes) < 20:
+        raise ValueError("Insufficient weekly data")
 
-    weekly_closes = weekly["Close"]
-
-    # --- fetch daily data for SMA200 + 52w range (need 1+ year) ---
-    daily = t.history(period="2y", interval="1d")
-    if daily.empty:
-        raise ValueError(f"Insufficient daily data for {ticker}")
-
-    daily_closes = daily["Close"]
+    if daily_closes.empty:
+        raise ValueError("Insufficient daily data")
 
     # --- compute each component ---
     rsi = _compute_rsi(weekly_closes)

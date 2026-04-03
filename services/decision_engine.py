@@ -1,3 +1,5 @@
+from typing import Optional
+
 """
 services/decision_engine.py
 -----------------------------
@@ -116,7 +118,7 @@ def _detect_flags(tech: dict, fund: dict, sent_score: int) -> list[str]:
 
 # ── VETO CHECK ────────────────────────────────────────────────────────────────
 
-def _check_veto(tech: dict, fund: dict) -> str | None:
+def _check_veto(tech: dict, fund: dict) -> Optional[str]:
     """Returns veto reason string if any veto condition is met, else None."""
     fund_score = fund.get("score", 0)
     breakdown = fund.get("breakdown", {})
