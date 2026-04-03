@@ -270,7 +270,7 @@ def analyze(data: dict) -> dict:
         grade = "INSUFFICIENT_DATA"
 
     sector = _safe_get(info, "sector", default="Unknown")
-    name = _safe_get(info, "longName", "shortName", default=ticker)
+    name = _safe_get(info, "longName", "shortName", default="Unknown")
 
     summary = f"{name} ({sector}): {total}/8 — {grade}"
 
