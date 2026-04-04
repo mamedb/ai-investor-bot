@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Investor — Portfolio Calculator</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 2rem 1rem 4rem;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 1.8rem;
+      font-weight: 700;
+      letter-spacing: .04em;
+      margin-bottom: .4rem;
+      color: #f8fafc;
+    }
+    h1 span { color: #38bdf8; }
+
+    .subtitle {
+      text-align: center;
+      color: #64748b;
+      font-size: .9rem;
+      margin-bottom: 2rem;
+    }
+
+    /* ── Nav links ──────────────────────────────────── */
+    .nav {
+      display: flex;
+      justify-content: center;
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+      font-size: .9rem;
+    }
+    .nav a {
+      color: #38bdf8;
+      text-decoration: none;
+      opacity: .75;
+      transition: opacity .2s;
+    }
+    .nav a:hover, .nav a.active { opacity: 1; font-weight: 600; }
+
+    /* ── Form card ──────────────────────────────────── */
+    .form-card {
+      max-width: 700px;
+      margin: 0 auto 2rem;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 14px;
+      padding: 2rem;
+    }
+    .form-card h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #94a3b8;
+      margin-bottom: 1.5rem;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 1.2rem;
+      margin-bottom: 1.5rem;
+    }
+    @media (max-width: 580px) { .form-grid { grid-template-columns: 1fr; } }
+
+    .field label {
+      display: block;
+      font-size: .8rem;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      margin-bottom: .4rem;
+    }
+    .field input, .field select {
+      width: 100%;
+      padding: .65rem 1rem;
+      border-radius: 8px;
+      border: 1px solid #334155;
+      background: #0f1117;
+      color: #f1f5f9;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color .2s;
+    }
+    .field input:focus, .field select:focus { border-color: #38bdf8; }
+    .field select option { background: #1e293b; }
+
+    /* Risk cards */
+    .risk-group {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: .75rem;
+      margin-bottom: 1.5rem;
+    }
+    @media (max-width: 480px) { .risk-group { grid-template-columns: 1fr; } }
+
+    .risk-card {
+      border: 2px solid #334155;
+      border-radius: 10px;
+      padding: 1rem;
+      cursor: pointer;
+      text-align: center;
+      transition: border-color .2s, background .2s;
+      user-select: none;
+    }
+    .risk-card:hover { border-color: #475569; }
+    .risk-card.selected { border-color: #38bdf8; background: #0ea5e920; }
+    .risk-card .risk-icon { font-size: 1.6rem; margin-bottom: .4rem; }
+    .risk-card .risk-name { font-weight: 700; font-size: .95rem; margin-bottom: .2rem; }
+    .risk-card .risk-desc { font-size: .75rem; color: #64748b; line-height: 1.4; }
+    .risk-card[data-risk="conservative"] .risk-name { color: #4ade80; }
+    .risk-card[data-risk="moderate"]     .risk-name { color: #fbbf24; }
+    .risk-card[data-risk="aggressive"]   .risk-name { color: #f87171; }
+
+    .calc-btn {
+      width: 100%;
+      padding: .75rem;
+      border-radius: 10px;
+      border: none;
+      background: #0ea5e9;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    .calc-btn:hover { background: #38bdf8; }
+    .calc-btn:disabled { background: #334155; cursor: not-allowed; }
+
+    /* ── Spinner / error ────────────────────────────── */
+    .spinner {
+      display: none;
+      text-align: center;
+      margin: 2rem 0;
+      color: #94a3b8;
+      font-size: .9rem;
+    }
+    .spinner.active { display: block; }
+    .spinner::before {
+      content: '';
+      display: inline-block;
+      width: 28px; height: 28px;
+      border: 3px solid #334155;
+      border-top-color: #38bdf8;
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+      vertical-align: middle;
+      margin-right: .6rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .error-box {
+      display: none;
+      max-width: 700px;
+      margin: 0 auto 1.5rem;
+      padding: .8rem 1rem;
+      border-radius: 8px;
+      background: #450a0a;
+      border: 1px solid #7f1d1d;
+      color: #fca5a5;
+      font-size: .9rem;
+    }
+    .error-box.active { display: block; }
+
+    /* ── Results area ───────────────────────────────── */
+    #results { display: none; max-width: 900px; margin: 0 auto; }
+    #results.active { display: block; }
+
+    /* Summary banner */
+    .summary-banner {
+      border-radius: 12px;
+      padding: 1.4rem 1.8rem;
+      margin-bottom: 1.5rem;
+      background: #1e293b;
+      border: 1px solid #334155;
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .sum-block { flex: 1; min-width: 130px; }
+    .sum-block .label { font-size: .72rem; color: #64748b; text-transform: uppercase; letter-spacing: .05em; margin-bottom: .25rem; }
+    .sum-block .value { font-size: 1.5rem; font-weight: 800; }
+    .sum-block .value.green { color: #4ade80; }
+    .sum-block .value.yellow { color: #fbbf24; }
+    .sum-block .value.blue { color: #38bdf8; }
+    .sum-block .value.red { color: #f87171; }
+
+    /* Two-column layout for charts + table */
+    .results-grid {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 1.2rem;
+      margin-bottom: 1.2rem;
+    }
+    @media (max-width: 720px) { .results-grid { grid-template-columns: 1fr; } }
+
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 1.4rem;
+    }
+    .card h3 {
+      font-size: .8rem;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: #64748b;
+      margin-bottom: 1rem;
+    }
+
+    /* Allocation table */
+    .alloc-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .85rem;
+    }
+    .alloc-table th {
+      text-align: left;
+      padding: .4rem .5rem;
+      color: #64748b;
+      font-size: .72rem;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      border-bottom: 1px solid #334155;
+    }
+    .alloc-table td {
+      padding: .55rem .5rem;
+      border-bottom: 1px solid #1e293b;
+      vertical-align: middle;
+    }
+    .alloc-table tr:hover td { background: #1e293b40; }
+
+    /* Category badge */
+    .badge {
+      display: inline-block;
+      padding: .15rem .5rem;
+      border-radius: 4px;
+      font-size: .7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .badge.etf    { background: #1d4ed820; color: #60a5fa; }
+    .badge.stock  { background: #14532d20; color: #4ade80; }
+    .badge.crypto { background: #78350f20; color: #fbbf24; }
+
+    .decision-pill {
+      display: inline-block;
+      padding: .15rem .5rem;
+      border-radius: 4px;
+      font-size: .7rem;
+      font-weight: 700;
+    }
+    .decision-pill.STRONG_BUY { background: #14532d; color: #4ade80; }
+    .decision-pill.BUY        { background: #052e16; color: #86efac; }
+    .decision-pill.HOLD       { background: #713f12; color: #fde68a; }
+    .decision-pill.AVOID      { background: #450a0a; color: #fca5a5; }
+
+    /* Bar pct fill */
+    .pct-bar-wrap { width: 80px; background: #334155; border-radius: 4px; height: 6px; display: inline-block; vertical-align: middle; margin-right: .4rem; }
+    .pct-bar      { height: 6px; border-radius: 4px; background: #38bdf8; }
+
+    /* Projection chart */
+    .proj-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 1.4rem;
+      margin-bottom: 1.2rem;
+    }
+    .proj-card h3 { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: #64748b; margin-bottom: 1rem; }
+
+    /* Logout */
+    .logout-btn {
+      position: fixed;
+      top: 1rem; right: 1rem;
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #94a3b8;
+      padding: .4rem .8rem;
+      border-radius: 8px;
+      font-size: .8rem;
+      text-decoration: none;
+      transition: color .2s, border-color .2s;
+    }
+    .logout-btn:hover { color: #f1f5f9; border-color: #64748b; }
+  </style>
+</head>
+<body>
+
+<a class="logout-btn" href="/logout">Выйти</a>
+
+<h1>AI <span>Investor</span></h1>
+<p class="subtitle">Калькулятор инвестиционного портфеля</p>
+
+<nav class="nav">
+  <a href="/">Анализ активов</a>
+  <a href="/portfolio" class="active">Портфель</a>
+</nav>
+
+<!-- ── Input form ──────────────────────────────────────────── -->
+<div class="form-card">
+  <h2>Параметры портфеля</h2>
+
+  <div class="form-grid">
+    <div class="field">
+      <label>Ежемесячная сумма ($)</label>
+      <input type="number" id="monthlyAmount" min="1" step="1" value="500" placeholder="500" />
+    </div>
+    <div class="field">
+      <label>Срок (месяцев)</label>
+      <input type="number" id="durationMonths" min="1" max="600" value="60" placeholder="60" />
+    </div>
+    <div class="field">
+      <label>Аналитических активов</label>
+      <input type="text" id="assetCount" value="18 активов" disabled style="color:#64748b;cursor:default;" />
+    </div>
+  </div>
+
+  <p style="font-size:.8rem;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.75rem;">Уровень риска</p>
+  <div class="risk-group">
+    <div class="risk-card" data-risk="conservative">
+      <div class="risk-icon">🛡️</div>
+      <div class="risk-name">Консервативный</div>
+      <div class="risk-desc">65% ETF, 35% акции<br>~7% год. доходность</div>
+    </div>
+    <div class="risk-card selected" data-risk="moderate">
+      <div class="risk-icon">⚖️</div>
+      <div class="risk-name">Умеренный</div>
+      <div class="risk-desc">35% ETF, 55% акции, 10% крипто<br>~10% год. доходность</div>
+    </div>
+    <div class="risk-card" data-risk="aggressive">
+      <div class="risk-icon">🚀</div>
+      <div class="risk-name">Агрессивный</div>
+      <div class="risk-desc">15% ETF, 55% акции, 30% крипто<br>~15% год. доходность</div>
+    </div>
+  </div>
+
+  <button class="calc-btn" id="calcBtn" onclick="calculate()">Рассчитать портфель</button>
+</div>
+
+<!-- ── Spinner / error ─────────────────────────────────────── -->
+<div class="spinner" id="spinner">Анализируем активы, это может занять 30–60 секунд…</div>
+<div class="error-box" id="errorBox"></div>
+
+<!-- ── Results ─────────────────────────────────────────────── -->
+<div id="results">
+
+  <!-- Summary -->
+  <div class="summary-banner" id="summaryBanner"></div>
+
+  <!-- Pie + Table -->
+  <div class="results-grid">
+    <div class="card">
+      <h3>Распределение активов</h3>
+      <canvas id="pieChart" height="280"></canvas>
+    </div>
+    <div class="card">
+      <h3>Детали аллокации</h3>
+      <table class="alloc-table" id="allocTable">
+        <thead>
+          <tr>
+            <th>Тикер</th>
+            <th>Тип</th>
+            <th>Решение</th>
+            <th>Счёт</th>
+            <th style="text-align:right">%</th>
+            <th style="text-align:right">$/мес</th>
+          </tr>
+        </thead>
+        <tbody id="allocBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Growth projection chart -->
+  <div class="proj-card">
+    <h3>Прогноз роста портфеля</h3>
+    <canvas id="lineChart" height="120"></canvas>
+  </div>
+
+</div>
+
+<script>
+/* ── Risk card selection ─────────────────────────────────── */
+let selectedRisk = 'moderate';
+document.querySelectorAll('.risk-card').forEach(card => {
+  card.addEventListener('click', () => {
+    document.querySelectorAll('.risk-card').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    selectedRisk = card.dataset.risk;
+  });
+});
+
+/* ── Chart instances ─────────────────────────────────────── */
+let pieChart = null;
+let lineChart = null;
+
+/* ── Color palettes ──────────────────────────────────────── */
+const CAT_COLORS = {
+  etf:    '#60a5fa',
+  stock:  '#4ade80',
+  crypto: '#fbbf24',
+};
+
+const PIE_COLORS = [
+  '#38bdf8','#818cf8','#34d399','#f472b6','#fb923c',
+  '#a78bfa','#4ade80','#fbbf24','#f87171','#2dd4bf',
+  '#e879f9','#86efac','#fcd34d','#93c5fd','#c4b5fd',
+  '#6ee7b7','#fda4af','#67e8f9',
+];
+
+/* ── Calculate ───────────────────────────────────────────── */
+async function calculate() {
+  const monthly = parseFloat(document.getElementById('monthlyAmount').value);
+  const months  = parseInt(document.getElementById('durationMonths').value);
+
+  if (!monthly || monthly <= 0) { showError('Введите корректную ежемесячную сумму.'); return; }
+  if (!months || months < 1 || months > 600) { showError('Срок должен быть от 1 до 600 месяцев.'); return; }
+
+  showSpinner(true);
+  hideError();
+  document.getElementById('results').classList.remove('active');
+  document.getElementById('calcBtn').disabled = true;
+
+  const formData = new FormData();
+  formData.append('monthly_amount', monthly);
+  formData.append('duration_months', months);
+  formData.append('risk_level', selectedRisk);
+
+  try {
+    const res = await fetch('/portfolio/calculate', { method: 'POST', body: formData });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Ошибка сервера');
+    }
+    const data = await res.json();
+    renderResults(data);
+  } catch (e) {
+    showError('Ошибка: ' + e.message);
+  } finally {
+    showSpinner(false);
+    document.getElementById('calcBtn').disabled = false;
+  }
+}
+
+/* ── Render results ──────────────────────────────────────── */
+function renderResults(data) {
+  const { allocations, projection, summary } = data;
+
+  /* Summary banner */
+  const risk_labels = { conservative: 'Консервативный', moderate: 'Умеренный', aggressive: 'Агрессивный' };
+  const risk_colors = { conservative: 'green', moderate: 'yellow', aggressive: 'red' };
+  const rc = risk_colors[summary.risk_level] || 'blue';
+  document.getElementById('summaryBanner').innerHTML = `
+    <div class="sum-block">
+      <div class="label">Уровень риска</div>
+      <div class="value ${rc}">${risk_labels[summary.risk_level]}</div>
+    </div>
+    <div class="sum-block">
+      <div class="label">Инвестировано</div>
+      <div class="value blue">$${fmt(summary.total_invested)}</div>
+    </div>
+    <div class="sum-block">
+      <div class="label">Прогноз стоимости</div>
+      <div class="value green">$${fmt(summary.projected_value)}</div>
+    </div>
+    <div class="sum-block">
+      <div class="label">Ожидаемый доход</div>
+      <div class="value green">+$${fmt(summary.expected_gain)}</div>
+    </div>
+    <div class="sum-block">
+      <div class="label">ROI</div>
+      <div class="value ${rc}">+${summary.roi_pct}%</div>
+    </div>
+    <div class="sum-block">
+      <div class="label">Год. доходность</div>
+      <div class="value yellow">${summary.annual_return_pct}% / год</div>
+    </div>
+  `;
+
+  /* Pie chart */
+  const labels = allocations.map(a => a.ticker);
+  const pcts   = allocations.map(a => a.pct);
+  const colors = allocations.map((_, i) => PIE_COLORS[i % PIE_COLORS.length]);
+
+  if (pieChart) pieChart.destroy();
+  pieChart = new Chart(document.getElementById('pieChart'), {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{ data: pcts, backgroundColor: colors, borderColor: '#0f1117', borderWidth: 2 }]
+    },
+    options: {
+      plugins: {
+        legend: { display: true, position: 'bottom', labels: { color: '#94a3b8', font: { size: 11 }, boxWidth: 12, padding: 8 } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed}%` } },
+      },
+      cutout: '62%',
+    }
+  });
+
+  /* Allocation table */
+  const tbody = document.getElementById('allocBody');
+  tbody.innerHTML = '';
+  allocations.forEach((a, i) => {
+    const color = PIE_COLORS[i % PIE_COLORS.length];
+    const barPct = Math.min(a.pct, 100);
+    tbody.innerHTML += `
+      <tr>
+        <td style="font-weight:700;color:${color}">${a.ticker}</td>
+        <td><span class="badge ${a.category}">${a.category.toUpperCase()}</span></td>
+        <td><span class="decision-pill ${a.decision}">${a.decision.replace('_',' ')}</span></td>
+        <td style="color:#94a3b8">${a.score}/18</td>
+        <td style="text-align:right">
+          <span class="pct-bar-wrap"><span class="pct-bar" style="width:${barPct}%;background:${color}"></span></span>
+          ${a.pct}%
+        </td>
+        <td style="text-align:right;font-weight:600">$${a.monthly_usd.toFixed(2)}</td>
+      </tr>
+    `;
+  });
+
+  /* Line chart */
+  const months = projection.map(p => p.month);
+  const values = projection.map(p => p.value);
+  const invested = projection.map(p => p.invested);
+
+  if (lineChart) lineChart.destroy();
+  lineChart = new Chart(document.getElementById('lineChart'), {
+    type: 'line',
+    data: {
+      labels: months,
+      datasets: [
+        {
+          label: 'Стоимость портфеля',
+          data: values,
+          borderColor: '#38bdf8',
+          backgroundColor: '#38bdf820',
+          fill: true,
+          tension: .4,
+          pointRadius: projection.length > 60 ? 0 : 3,
+        },
+        {
+          label: 'Вложено',
+          data: invested,
+          borderColor: '#64748b',
+          backgroundColor: 'transparent',
+          borderDash: [5, 5],
+          tension: 0,
+          pointRadius: 0,
+        },
+      ]
+    },
+    options: {
+      scales: {
+        x: {
+          ticks: { color: '#64748b', maxTicksLimit: 12 },
+          grid:  { color: '#1e293b' },
+          title: { display: true, text: 'Месяцы', color: '#64748b' },
+        },
+        y: {
+          ticks: { color: '#64748b', callback: v => '$' + fmt(v) },
+          grid:  { color: '#1e293b' },
+        },
+      },
+      plugins: {
+        legend: { labels: { color: '#94a3b8', font: { size: 11 } } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: $${fmt(ctx.parsed.y)}` } },
+      },
+    }
+  });
+
+  document.getElementById('results').classList.add('active');
+  document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* ── Helpers ─────────────────────────────────────────────── */
+function fmt(n) {
+  return Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+function showSpinner(on) {
+  document.getElementById('spinner').classList.toggle('active', on);
+}
+function showError(msg) {
+  const el = document.getElementById('errorBox');
+  el.textContent = msg;
+  el.classList.add('active');
+}
+function hideError() {
+  document.getElementById('errorBox').classList.remove('active');
+}
+</script>
+</body>
+</html>

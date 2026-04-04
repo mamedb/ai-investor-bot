@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException, Request, Form, Depends
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 from services.data_service import get_stock_data
@@ -10,7 +10,9 @@ from services.crypto_analysis import analyze as crypto_analysis
 from services.sentiment_analysis import analyze as sentiment_analysis
 from services.decision_engine import decide as make_decision
 from services.db_service import save_result, get_history
+from services.portfolio_service import build_portfolio
 import os
+from typing import Optional
 
 app = FastAPI()
 
@@ -144,3 +146,32 @@ def analyze_stock(ticker: str, _auth=Depends(_require_auth)):
 @app.get("/history")
 def history(limit: int = 50, _auth=Depends(_require_auth)):
     return get_history(limit)
+
+
+@app.get("/portfolio")
+def portfolio_page(_auth=Depends(_require_auth)):
+    return FileResponse(
+        os.path.join(_static_dir, "portfolio.html"),
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
+
+
+@app.post("/portfolio/calculate")
+def portfolio_calculate(
+    request: Request,
+    monthly_amount: float = Form(...),
+    duration_months: int = Form(...),
+    risk_level: str = Form(...),
+    _auth=Depends(_require_auth),
+):
+    if risk_level not in ("conservative", "moderate", "aggressive"):
+        raise HTTPException(status_code=400, detail="Invalid risk_level")
+    if monthly_amount <= 0:
+        raise HTTPException(status_code=400, detail="monthly_amount must be positive")
+    if not (1 <= duration_months <= 600):
+        raise HTTPException(status_code=400, detail="duration_months must be 1–600")
+    try:
+        result = build_portfolio(monthly_amount, duration_months, risk_level)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Portfolio calculation failed: {e}")
+    return JSONResponse(content=result)
