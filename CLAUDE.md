@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 # Load env vars then start (OPENAI_API_KEY required for sentiment)
 set -a && source .env && set +a
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
 ```
 
 **Authentication env vars** (add to `.env`):

@@ -18,7 +18,7 @@ _SECRET_KEY      = os.environ.get("SECRET_KEY", "change-me-in-production")
 _LOGIN_USERNAME  = os.environ.get("LOGIN_USERNAME", "admin")
 _LOGIN_PASSWORD  = os.environ.get("LOGIN_PASSWORD", "password")
 
-app.add_middleware(SessionMiddleware, secret_key=_SECRET_KEY)
+app.add_middleware(SessionMiddleware, secret_key=_SECRET_KEY, https_only=False)
 
 _static_dir = os.path.join(os.path.dirname(__file__), "..", "static")
 app.mount("/static", StaticFiles(directory=_static_dir), name="static")
