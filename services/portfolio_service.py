@@ -1,13 +1,18 @@
 """
-Portfolio builder: analyzes a universe of assets and constructs a
-risk-weighted allocation with compound-growth projections.
+Portfolio builder: analyzes a universe of assets, then uses OpenAI to
+select up to 10 best-fit assets and determine percentage allocations
+based on risk profile and analysis scores.
 """
 
 from __future__ import annotations
 
-import asyncio
+import json
+import logging
+import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any
+from typing import Any, Optional
+
+from openai import OpenAI
 
 from services.data_service import get_stock_data
 from services.technical_analysis import analyze as technical_analysis
@@ -17,6 +22,8 @@ from services.crypto_analysis import analyze as crypto_analysis
 from services.sentiment_analysis import analyze as sentiment_analysis
 from services.decision_engine import decide as make_decision
 
+logger = logging.getLogger(__name__)
+
 # ── Asset universe ───────────────────────────────────────────────────────────
 
 UNIVERSE: dict[str, list[str]] = {
@@ -25,26 +32,26 @@ UNIVERSE: dict[str, list[str]] = {
     "crypto": ["BTC-USD", "ETH-USD", "SOL-USD"],
 }
 
-# Category weights per risk profile (must sum to 1.0)
-RISK_WEIGHTS: dict[str, dict[str, float]] = {
-    "conservative": {"etf": 0.65, "stock": 0.35, "crypto": 0.00},
-    "moderate":     {"etf": 0.35, "stock": 0.55, "crypto": 0.10},
-    "aggressive":   {"etf": 0.15, "stock": 0.55, "crypto": 0.30},
-}
-
-# Expected annual return for projection (simplified)
+# Expected annual return for projection — used when OpenAI doesn't return one
 RISK_ANNUAL_RETURN: dict[str, float] = {
     "conservative": 0.07,
     "moderate":     0.10,
     "aggressive":   0.15,
 }
 
-# Minimum score to be included in the portfolio (out of 18)
-MIN_SCORE: dict[str, int] = {
-    "conservative": 10,
-    "moderate":     7,
-    "aggressive":   4,
-}
+# ── OpenAI client ────────────────────────────────────────────────────────────
+
+_client: Optional[OpenAI] = None
+
+
+def _get_client() -> Optional[OpenAI]:
+    global _client
+    if _client is None:
+        key = os.getenv("OPENAI_API_KEY")
+        if not key:
+            return None
+        _client = OpenAI(api_key=key)
+    return _client
 
 
 # ── Single-ticker analysis ───────────────────────────────────────────────────
@@ -77,48 +84,147 @@ def _analyze_one(ticker: str) -> dict[str, Any]:
     price = info.get("currentPrice") or info.get("regularMarketPrice") or 0
 
     return {
-        "ticker":     ticker,
-        "name":       info.get("longName") or info.get("shortName") or ticker,
-        "quote_type": quote_type,
-        "score":      decision.get("score", 0),
-        "decision":   decision.get("decision", "AVOID"),
-        "confidence": decision.get("confidence", "LOW"),
-        "price":      price,
-        "technical":  technical,
-        "fundamental": fundamental,
-        "sentiment":  sentiment,
+        "ticker":       ticker,
+        "name":         info.get("longName") or info.get("shortName") or ticker,
+        "quote_type":   quote_type,
+        "score":        decision.get("score", 0),
+        "decision":     decision.get("decision", "AVOID"),
+        "confidence":   decision.get("confidence", "LOW"),
+        "price":        price,
+        "technical":    technical,
+        "fundamental":  fundamental,
+        "sentiment":    sentiment,
         "full_decision": decision,
     }
 
 
-def analyze_universe(risk_level: str) -> list[dict[str, Any]]:
-    """
-    Analyze all tickers in UNIVERSE in parallel (thread pool).
-    Returns list of result dicts for the categories relevant to risk_level.
-    """
-    weights = RISK_WEIGHTS[risk_level]
-    tickers_to_run: list[tuple[str, str]] = []   # (category, ticker)
-    for category, weight in weights.items():
-        if weight > 0:
-            for t in UNIVERSE.get(category, []):
-                tickers_to_run.append((category, t))
+def _analyze_universe() -> list[dict[str, Any]]:
+    """Analyze all tickers in UNIVERSE in parallel."""
+    tickers_to_run: list[tuple[str, str]] = [
+        (cat, ticker)
+        for cat, tickers in UNIVERSE.items()
+        for ticker in tickers
+    ]
 
     results: list[dict[str, Any]] = []
     with ThreadPoolExecutor(max_workers=6) as pool:
         future_map = {
-            pool.submit(_analyze_one, ticker): (category, ticker)
-            for category, ticker in tickers_to_run
+            pool.submit(_analyze_one, ticker): (cat, ticker)
+            for cat, ticker in tickers_to_run
         }
         for future in as_completed(future_map):
-            category, ticker = future_map[future]
+            cat, ticker = future_map[future]
             try:
                 res = future.result()
             except Exception as exc:
                 res = {"ticker": ticker, "error": str(exc), "score": 0, "decision": "AVOID"}
-            res["_category"] = category
+            res["_category"] = cat
             results.append(res)
 
     return results
+
+
+# ── AI allocation ────────────────────────────────────────────────────────────
+
+_PORTFOLIO_SYSTEM_PROMPT = """\
+You are a professional portfolio manager. You receive a list of analyzed assets \
+(with scores 0–18, decisions, and category) and a risk profile. Your job is to \
+select up to 10 assets for the portfolio and assign percentage allocations that \
+sum to exactly 100.
+
+Rules:
+- Choose assets that best fit the risk profile — no fixed category quotas.
+- Higher score and stronger decision (STRONG_BUY > BUY > HOLD > AVOID) should generally mean higher allocation.
+- AVOID decisions should be excluded unless there are no better options.
+- For conservative: favor lower-volatility assets (ETFs, blue-chip stocks); minimize crypto.
+- For moderate: balanced growth-oriented mix; crypto is acceptable in small amounts.
+- For aggressive: growth stocks and crypto can receive significant allocations.
+- Estimate a realistic expected annual return percentage for the constructed portfolio.
+
+Return ONLY valid JSON:
+{
+  "allocations": [
+    {"ticker": "<TICKER>", "pct": <number>},
+    ...
+  ],
+  "expected_annual_return_pct": <number>,
+  "reasoning": "<one or two sentences explaining the portfolio construction>"
+}"""
+
+
+def _ai_allocate(
+    assets: list[dict[str, Any]], risk_level: str
+) -> tuple[list[dict], float, str]:
+    """
+    Ask OpenAI to select up to 10 assets and assign percentages.
+    Returns (allocations, annual_return_pct, reasoning).
+    Falls back to score-based top-10 if OpenAI is unavailable.
+    """
+    client = _get_client()
+    if client is None:
+        return _fallback_allocate(assets, risk_level)
+
+    summaries = [
+        {
+            "ticker":     a["ticker"],
+            "name":       a.get("name", a["ticker"]),
+            "category":   a.get("_category", "stock"),
+            "score":      a.get("score", 0),
+            "decision":   a.get("decision", "AVOID"),
+            "confidence": a.get("confidence", "LOW"),
+        }
+        for a in assets
+        if "error" not in a
+    ]
+
+    user_content = (
+        f"Risk level: {risk_level}\n\n"
+        f"Analyzed assets:\n{json.dumps(summaries, indent=2)}"
+    )
+
+    model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    try:
+        resp = client.chat.completions.create(
+            model=model,
+            temperature=0.3,
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": _PORTFOLIO_SYSTEM_PROMPT},
+                {"role": "user",   "content": user_content},
+            ],
+        )
+        result = json.loads(resp.choices[0].message.content)
+        allocations = result.get("allocations", [])
+        annual_return = float(result.get("expected_annual_return_pct", RISK_ANNUAL_RETURN[risk_level] * 100))
+        reasoning = result.get("reasoning", "")
+        if allocations:
+            return allocations, annual_return, reasoning
+    except Exception as e:
+        logger.warning("OpenAI portfolio allocation failed: %s", e)
+
+    return _fallback_allocate(assets, risk_level)
+
+
+def _fallback_allocate(
+    assets: list[dict[str, Any]], risk_level: str
+) -> tuple[list[dict], float, str]:
+    """Score-based top-10 fallback when OpenAI is unavailable."""
+    candidates = [
+        a for a in assets
+        if "error" not in a and a.get("decision") != "AVOID"
+    ]
+    if not candidates:
+        candidates = [a for a in assets if "error" not in a]
+
+    candidates.sort(key=lambda x: -x.get("score", 0))
+    top = candidates[:10]
+    total_score = sum(a.get("score", 1) for a in top) or 1
+    allocs = [
+        {"ticker": a["ticker"], "pct": round(a.get("score", 1) / total_score * 100, 2)}
+        for a in top
+    ]
+    annual_return = RISK_ANNUAL_RETURN[risk_level] * 100
+    return allocs, annual_return, ""
 
 
 # ── Portfolio builder ────────────────────────────────────────────────────────
@@ -129,63 +235,44 @@ def build_portfolio(
     risk_level: str,
 ) -> dict[str, Any]:
     """
-    Main entry point.  Analyzes universe assets and returns:
-      allocations  – list of per-asset dicts with weights and monthly amounts
-      projection   – month-by-month portfolio value
-      summary      – totals / metadata
+    Main entry point. Analyzes the universe, calls OpenAI to pick up to 10
+    assets and set allocations, then returns allocations + projection + summary.
     """
-    all_results = analyze_universe(risk_level)
-    weights     = RISK_WEIGHTS[risk_level]
-    min_score   = MIN_SCORE[risk_level]
+    all_results = _analyze_universe()
 
-    # Group passing assets by category
-    by_cat: dict[str, list[dict]] = {"etf": [], "stock": [], "crypto": []}
-    for r in all_results:
-        cat = r.get("_category", "stock")
-        if r.get("score", 0) >= min_score and "error" not in r:
-            by_cat[cat].append(r)
+    # Index by ticker for quick lookup
+    by_ticker: dict[str, dict] = {r["ticker"]: r for r in all_results}
 
-    # Build weighted allocations
+    ai_allocs, annual_return_pct, reasoning = _ai_allocate(all_results, risk_level)
+
+    # Renormalize to exactly 100%
+    total_pct = sum(a["pct"] for a in ai_allocs) or 1
+    for a in ai_allocs:
+        a["pct"] = round(a["pct"] / total_pct * 100, 2)
+
+    # Build full allocation records
     allocations: list[dict[str, Any]] = []
-
-    for category, cat_weight in weights.items():
-        if cat_weight == 0:
+    for a in ai_allocs:
+        asset = by_ticker.get(a["ticker"])
+        if not asset:
             continue
-        candidates = by_cat.get(category, [])
-        if not candidates:
-            # fall back: take top-3 by score regardless of min_score
-            candidates = sorted(
-                [r for r in all_results if r.get("_category") == category and "error" not in r],
-                key=lambda x: -x.get("score", 0),
-            )[:3]
-        if not candidates:
-            continue
-
-        total_score = sum(c["score"] for c in candidates) or 1
-        for asset in candidates:
-            share = cat_weight * (asset["score"] / total_score)
-            allocations.append({
-                "ticker":        asset["ticker"],
-                "name":          asset.get("name", asset["ticker"]),
-                "category":      category,
-                "score":         asset["score"],
-                "decision":      asset["decision"],
-                "confidence":    asset.get("confidence", "LOW"),
-                "price":         asset.get("price", 0),
-                "pct":           round(share * 100, 2),
-                "monthly_usd":   round(monthly_amount * share, 2),
-            })
-
-    # Renormalize so allocations sum to exactly 100 %
-    total_pct = sum(a["pct"] for a in allocations) or 1
-    for a in allocations:
-        a["pct"]         = round(a["pct"] / total_pct * 100, 2)
-        a["monthly_usd"] = round(monthly_amount * a["pct"] / 100, 2)
+        pct = a["pct"]
+        allocations.append({
+            "ticker":      asset["ticker"],
+            "name":        asset.get("name", asset["ticker"]),
+            "category":    asset.get("_category", "stock"),
+            "score":       asset.get("score", 0),
+            "decision":    asset.get("decision", "AVOID"),
+            "confidence":  asset.get("confidence", "LOW"),
+            "price":       asset.get("price", 0),
+            "pct":         pct,
+            "monthly_usd": round(monthly_amount * pct / 100, 2),
+        })
 
     allocations.sort(key=lambda x: -x["pct"])
 
     # ── Compound growth projection ───────────────────────────────────────────
-    annual_rate  = RISK_ANNUAL_RETURN[risk_level]
+    annual_rate  = annual_return_pct / 100
     monthly_rate = annual_rate / 12
 
     projection: list[dict] = []
@@ -194,11 +281,10 @@ def build_portfolio(
             fv = monthly_amount * ((1 + monthly_rate) ** m - 1) / monthly_rate * (1 + monthly_rate)
         else:
             fv = monthly_amount * m
-        invested = monthly_amount * m
         projection.append({
             "month":    m,
             "value":    round(fv, 2),
-            "invested": round(invested, 2),
+            "invested": round(monthly_amount * m, 2),
         })
 
     total_invested  = monthly_amount * duration_months
@@ -209,13 +295,14 @@ def build_portfolio(
         "allocations": allocations,
         "projection":  projection,
         "summary": {
-            "risk_level":       risk_level,
-            "monthly_amount":   monthly_amount,
-            "duration_months":  duration_months,
-            "annual_return_pct": annual_rate * 100,
-            "total_invested":   round(total_invested, 2),
-            "projected_value":  round(projected_value, 2),
-            "expected_gain":    round(expected_gain, 2),
-            "roi_pct":          round(expected_gain / total_invested * 100, 1) if total_invested else 0,
+            "risk_level":            risk_level,
+            "monthly_amount":        monthly_amount,
+            "duration_months":       duration_months,
+            "annual_return_pct":     round(annual_return_pct, 1),
+            "total_invested":        round(total_invested, 2),
+            "projected_value":       round(projected_value, 2),
+            "expected_gain":         round(expected_gain, 2),
+            "roi_pct":               round(expected_gain / total_invested * 100, 1) if total_invested else 0,
+            "ai_reasoning":          reasoning,
         },
     }

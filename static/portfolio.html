@@ -385,6 +385,12 @@
     </div>
   </div>
 
+  <!-- AI Reasoning -->
+  <div id="reasoningCard" style="display:none;max-width:900px;margin:0 auto 1.2rem;background:#1e293b;border:1px solid #334155;border-radius:12px;padding:1.2rem 1.4rem;">
+    <div style="font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:#64748b;margin-bottom:.5rem;">AI Reasoning</div>
+    <div id="reasoningText" style="font-size:.88rem;color:#cbd5e1;line-height:1.6;"></div>
+  </div>
+
   <!-- Growth projection chart -->
   <div class="proj-card">
     <h3>Portfolio Growth Projection</h3>
@@ -459,6 +465,16 @@ async function calculate() {
 /* ── Render results ──────────────────────────────────────── */
 function renderResults(data) {
   const { allocations, projection, summary } = data;
+
+  /* AI reasoning */
+  const reasoningCard = document.getElementById('reasoningCard');
+  const reasoningText = document.getElementById('reasoningText');
+  if (summary.ai_reasoning) {
+    reasoningText.textContent = summary.ai_reasoning;
+    reasoningCard.style.display = '';
+  } else {
+    reasoningCard.style.display = 'none';
+  }
 
   /* Summary banner */
   const risk_labels = { conservative: 'Conservative', moderate: 'Moderate', aggressive: 'Aggressive' };
