@@ -11,6 +11,13 @@ set -a && source .env && set +a
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
+**Authentication env vars** (add to `.env`):
+```
+LOGIN_USERNAME=admin      # default: admin
+LOGIN_PASSWORD=password   # default: password
+SECRET_KEY=your-secret    # default: change-me-in-production
+```
+
 **Telegram bot** (requires environment variables):
 ```bash
 export TELEGRAM_BOT_TOKEN="your-token"
@@ -62,5 +69,16 @@ All configuration is in-code (no config files):
 ### UI
 
 - Web GUI: `static/index.html` served at `GET /` by FastAPI
+- Login page: `static/login.html` served at `GET /login`
 - Telegram: `tg_bot.py` calls `/analyze/{ticker}` and formats results with emojis/markdown in Russian
 - UI-facing text and flag labels are in Russian
+
+### Authentication
+
+Session-based login protects all routes (`/`, `/analyze/{ticker}`, `/history`).
+
+- `GET /login` — login page; redirects to `/` if already authenticated
+- `POST /login` — validates credentials from `LOGIN_USERNAME` / `LOGIN_PASSWORD` env vars; sets signed session cookie via `SessionMiddleware` (requires `itsdangerous`)
+- `GET /logout` — clears session, redirects to `/login`
+- Unauthenticated requests to protected routes redirect to `/login` (HTTP 303)
+- Requires `python-multipart` installed for form handling

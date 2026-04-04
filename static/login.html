@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Investor — Login</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 2.4rem 2rem;
+      width: 100%;
+      max-width: 360px;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: .04em;
+      margin-bottom: 2rem;
+      color: #f8fafc;
+    }
+    h1 span { color: #38bdf8; }
+
+    .field {
+      margin-bottom: 1.1rem;
+    }
+    .field label {
+      display: block;
+      font-size: .8rem;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: #64748b;
+      margin-bottom: .4rem;
+    }
+    .field input {
+      width: 100%;
+      padding: .7rem 1rem;
+      border-radius: 8px;
+      border: 1px solid #334155;
+      background: #0f1117;
+      color: #f1f5f9;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color .2s;
+    }
+    .field input:focus { border-color: #38bdf8; }
+
+    .error {
+      display: none;
+      padding: .65rem .9rem;
+      border-radius: 8px;
+      background: #450a0a;
+      border: 1px solid #7f1d1d;
+      color: #fca5a5;
+      font-size: .85rem;
+      margin-bottom: 1.2rem;
+    }
+    .error.active { display: block; }
+
+    button[type="submit"] {
+      width: 100%;
+      padding: .75rem;
+      border-radius: 8px;
+      border: none;
+      background: #0ea5e9;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .2s;
+      margin-top: .4rem;
+    }
+    button[type="submit"]:hover { background: #38bdf8; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>AI <span>Investor</span></h1>
+
+    <div class="error" id="errorBox">Invalid username or password.</div>
+
+    <form method="POST" action="/login">
+      <div class="field">
+        <label for="username">Username</label>
+        <input id="username" name="username" type="text" autocomplete="username" autofocus required />
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required />
+      </div>
+      <button type="submit">Sign in</button>
+    </form>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('error')) {
+      document.getElementById('errorBox').classList.add('active');
+    }
+  </script>
+</body>
+</html>
