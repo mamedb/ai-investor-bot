@@ -6,6 +6,7 @@ from services.data_service import get_stock_data
 from services.technical_analysis import analyze as technical_analysis
 from services.fundamental_analysis import analyze as fundamental_analysis
 from services.etf_analysis import analyze as etf_analysis
+from services.crypto_analysis import analyze as crypto_analysis
 from services.sentiment_analysis import analyze as sentiment_analysis
 from services.decision_engine import decide as make_decision
 from services.db_service import save_result, get_history
@@ -75,27 +76,53 @@ def root(_auth=Depends(_require_auth)):
 
 @app.get("/analyze/{ticker}")
 def analyze_stock(ticker: str, _auth=Depends(_require_auth)):
+    ticker = ticker.upper()
+
     # single yfinance fetch — shared across all modules
     try:
-        data = get_stock_data(ticker.upper())
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        data = get_stock_data(ticker)
+    except ValueError:
+        # Auto-append -USD for bare crypto symbols (BTC → BTC-USD)
+        if "-" not in ticker:
+            try:
+                data = get_stock_data(ticker + "-USD")
+                ticker = ticker + "-USD"
+            except ValueError as e:
+                raise HTTPException(status_code=404, detail=str(e))
+            except Exception as e:
+                raise HTTPException(status_code=502, detail=f"Data fetch failed: {e}")
+        else:
+            raise HTTPException(status_code=404, detail=f"No data found for {ticker}")
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Data fetch failed: {e}")
 
-    is_etf = data.get("info", {}).get("quoteType") == "ETF"
+    quote_type = data.get("info", {}).get("quoteType", "")
+    is_etf    = quote_type == "ETF"
+    is_crypto = quote_type == "CRYPTOCURRENCY"
 
     try:
         technical = technical_analysis(data)
-        fundamental = etf_analysis(data) if is_etf else fundamental_analysis(data)
+        if is_crypto:
+            fundamental = crypto_analysis(data)
+        elif is_etf:
+            fundamental = etf_analysis(data)
+        else:
+            fundamental = fundamental_analysis(data)
         sentiment = sentiment_analysis(data)
         decision = make_decision(technical, fundamental, sentiment)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analysis failed: {e}")
 
+    if is_crypto:
+        asset_type = "CRYPTO"
+    elif is_etf:
+        asset_type = "ETF"
+    else:
+        asset_type = "STOCK"
+
     result = {
-        "ticker":      ticker.upper(),
-        "asset_type":  "ETF" if is_etf else "STOCK",
+        "ticker":      ticker,
+        "asset_type":  asset_type,
         "technical":   technical,
         "fundamental": fundamental,
         "sentiment":   sentiment,

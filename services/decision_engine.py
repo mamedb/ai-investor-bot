@@ -113,6 +113,13 @@ def _detect_flags(tech: dict, fund: dict, sent_score: int) -> list[str]:
         aum = breakdown.get("aum", {})
         if aum.get("value") is not None and float(aum["value"]) < 0.1:
             flags.append("⚠️ SMALL_AUM — риск ликвидности")
+    elif fund.get("is_crypto", False):
+        vol = breakdown.get("volatility", {})
+        if vol.get("score", 1) == 0 and vol.get("value") is not None:
+            flags.append("🌊 HIGH_VOLATILITY — крипто риск")
+        liq = breakdown.get("liquidity", {})
+        if liq.get("score", 1) == 0 and liq.get("value") is not None:
+            flags.append("⚠️ LOW_LIQUIDITY")
     elif fund.get("grade") == "INSUFFICIENT_DATA":
         flags.append("ℹ️ LIMITED_FUND_DATA (ETF or data gap)")
 
@@ -138,8 +145,8 @@ def _check_veto(tech: dict, fund: dict) -> Optional[str]:
     if tech.get("trend") == "DOWNTREND" and fund_score < 4:
         return "Нисходящий тренд при слабом фундаментале"
 
-    # Hard veto 3: both FCF and EPS negative (not applicable to ETFs)
-    if not fund.get("is_etf", False):
+    # Hard veto 3: both FCF and EPS negative (stocks only)
+    if not fund.get("is_etf", False) and not fund.get("is_crypto", False):
         fcf_neg = breakdown.get("free_cash_flow", {}).get("score", 1) == 0
         eps_neg = breakdown.get("eps_trend", {}).get("score", 1) == 0
         if fcf_neg and eps_neg and fund.get("grade") != "INSUFFICIENT_DATA":

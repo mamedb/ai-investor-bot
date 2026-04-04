@@ -395,7 +395,7 @@
 <script>
   const $ = id => document.getElementById(id);
 
-  // ── Top 20 by market cap (hardcoded, updated ~Q1 2026) ────────────────────
+  // ── Top 20 stocks + popular crypto (updated ~Q1 2026) ───────────────────
   const TOP20 = [
     { ticker: 'AAPL',  name: 'Apple',               cap: '3.5T' },
     { ticker: 'MSFT',  name: 'Microsoft',            cap: '3.0T' },
@@ -419,14 +419,41 @@
     { ticker: 'NFLX',  name: 'Netflix',              cap: '0.4T' },
   ];
 
+  const CRYPTO = [
+    { ticker: 'BTC-USD',  name: 'Bitcoin',       cap: '1.6T' },
+    { ticker: 'ETH-USD',  name: 'Ethereum',      cap: '0.2T' },
+    { ticker: 'BNB-USD',  name: 'BNB',           cap: '0.08T' },
+    { ticker: 'SOL-USD',  name: 'Solana',        cap: '0.06T' },
+    { ticker: 'XRP-USD',  name: 'XRP',           cap: '0.12T' },
+    { ticker: 'ADA-USD',  name: 'Cardano',       cap: '0.02T' },
+    { ticker: 'AVAX-USD', name: 'Avalanche',     cap: '0.01T' },
+    { ticker: 'DOT-USD',  name: 'Polkadot',      cap: '0.01T' },
+    { ticker: 'LINK-USD', name: 'Chainlink',     cap: '0.01T' },
+    { ticker: 'DOGE-USD', name: 'Dogecoin',      cap: '0.03T' },
+  ];
+
   (function buildDropdown() {
     const sel = $('topSelect');
+
+    const grpStocks = document.createElement('optgroup');
+    grpStocks.label = 'Top 20 Stocks by Market Cap';
     TOP20.forEach(({ ticker, name, cap }) => {
       const opt = document.createElement('option');
       opt.value = ticker;
       opt.textContent = `${ticker} — ${name} ($${cap})`;
-      sel.appendChild(opt);
+      grpStocks.appendChild(opt);
     });
+    sel.appendChild(grpStocks);
+
+    const grpCrypto = document.createElement('optgroup');
+    grpCrypto.label = 'Popular Crypto';
+    CRYPTO.forEach(({ ticker, name, cap }) => {
+      const opt = document.createElement('option');
+      opt.value = ticker;
+      opt.textContent = `${ticker} — ${name} ($${cap})`;
+      grpCrypto.appendChild(opt);
+    });
+    sel.appendChild(grpCrypto);
   })();
 
   function pickTop(ticker) {
@@ -475,12 +502,21 @@
     $('techW52').textContent   = `$${tech.week52_low}–$${tech.week52_high} | ${pos} (${tech.week52_signal})`;
 
     // ── Fundamental ──────────────────────────────────
-    $('fundTitle').textContent = d.asset_type === 'ETF' ? 'ETF Analysis' : 'Fundamental';
+    const titleMap = { ETF: 'ETF Analysis', CRYPTO: 'Crypto Analysis' };
+    $('fundTitle').textContent = titleMap[d.asset_type] || 'Fundamental';
     $('fundScore').textContent = fund.score;
     $('fundGrade').textContent = fund.grade;
     $('fundBar').style.width   = `${fund.score / 8 * 100}%`;
     $('fundName').textContent  = fund.name ? `${fund.name}${fund.sector ? ' · ' + fund.sector : ''}` : '';
-    const fundMap = d.asset_type === 'ETF'
+    const fundMap = d.asset_type === 'CRYPTO'
+      ? {
+          market_cap:    ['Market Cap',    2],
+          return_1y:     ['1Y Return',     2],
+          liquidity:     ['Liquidity',     2],
+          supply_health: ['Supply Health', 1],
+          volatility:    ['Volatility',    1],
+        }
+      : d.asset_type === 'ETF'
       ? {
           expense_ratio:  ['Expense ratio',  2],
           aum:            ['AUM',            2],
