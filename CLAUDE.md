@@ -30,7 +30,7 @@ python tg_bot.py
 curl http://localhost:8000/analyze/AAPL
 ```
 
-There is no requirements.txt, Dockerfile, or Makefile — dependencies (FastAPI, uvicorn, yfinance, pandas, python-telegram-bot) must be installed manually.
+There is no requirements.txt, Dockerfile, or Makefile — dependencies (FastAPI, uvicorn, yfinance, pandas, python-telegram-bot, python-multipart, itsdangerous, openai) must be installed manually.
 
 ## Architecture
 
@@ -40,23 +40,32 @@ This is a multi-factor stock analysis system with three independent scoring pill
 
 1. **Single data fetch** — `services/data_service.py:get_stock_data()` fetches yfinance data once per request and returns a shared dict passed to all analysis modules.
 
-2. **Three independent pillars** — each receives the shared data dict and returns `{score, breakdown, summary}`:
+2. **Asset type detection** — `app/main.py` reads `info.quoteType` after fetch:
+   - `STOCK` → `fundamental_analysis.py`
+   - `ETF` → `etf_analysis.py`
+   - `CRYPTOCURRENCY` → `crypto_analysis.py`
+   - Bare crypto symbols (e.g. `SOL`) are auto-retried as `SOL-USD` if the initial fetch returns no data.
+
+3. **Three independent pillars** — each receives the shared data dict and returns `{score, breakdown, summary}`:
    - `services/technical_analysis.py` — RSI, SMA200 trend, 52-week position (score 0–5)
    - `services/fundamental_analysis.py` — revenue growth, EPS, P/E vs sector, debt, margin, FCF (score 0–8)
-   - `services/sentiment_analysis.py` — analyst ratings, insider trades, institutional holdings (score 0–5)
+   - `services/etf_analysis.py` — expense ratio, AUM, 1Y/5Y return, dividend yield (score 0–8)
+   - `services/crypto_analysis.py` — market cap, 1Y return, liquidity, supply health, 30d volatility (score 0–8)
+   - `services/sentiment_analysis.py` — OpenAI GPT: news sentiment, analyst outlook, macro context (score 0–5)
 
-3. **Decision synthesis** — `services/decision_engine.py:decide()` applies:
-   - **Veto conditions** (hard stops checked first — e.g., negative FCF + declining EPS blocks any buy)
+4. **Decision synthesis** — `services/decision_engine.py:decide()` applies:
+   - **Veto conditions** (hard stops checked first — e.g., negative FCF + declining EPS blocks any buy; skipped for ETF and CRYPTO)
    - **Gate logic** (`GATES` dict, e.g., `STRONG_BUY` requires tech≥4, fund≥6, sent≥3, total≥13)
-   - **Flags** — warning signals appended to the output
+   - **Flags** — warning signals appended to the output (asset-type-aware: stocks, ETFs, and crypto each have specific flags)
    - **Confidence** — HIGH/MEDIUM/LOW based on pillar agreement
 
-4. **Output** — `app/main.py` returns JSON with `decision`, `score`, `confidence`, `reason`, `flags`, `pillar_scores`.
+5. **Output** — `app/main.py` returns JSON with `decision`, `score`, `confidence`, `reason`, `flags`, `pillar_scores`.
 
 ### Key Design Principles
 
 - **Fundamentals can veto technicals, but not vice versa** — veto logic runs before gate logic.
-- **Scoring contracts** — every analysis module returns a consistent `{score, breakdown}` dict; adding a new pillar means wiring it into `decision_engine.decide()`.
+- **Scoring contracts** — every analysis module returns a consistent `{score, breakdown}` dict; the fundamental slot is swappable (stock/ETF/crypto) without touching the decision engine.
+- **FCF/EPS veto is stocks-only** — skipped when `is_etf=True` or `is_crypto=True` on the fundamental result.
 - The decision engine accepts both legacy string sentiment and the new dict structure (backward compatibility).
 
 ### Configuration
@@ -70,6 +79,8 @@ All configuration is in-code (no config files):
 
 - Web GUI: `static/index.html` served at `GET /` by FastAPI
 - Login page: `static/login.html` served at `GET /login`
+- Dropdown has two optgroups: **Top 20 Stocks by Market Cap** and **Popular Crypto** (BTC-USD, ETH-USD, SOL-USD, etc.)
+- The Fundamental card adapts its label and rows based on `asset_type` (Stock / ETF / Crypto)
 - Telegram: `tg_bot.py` calls `/analyze/{ticker}` and formats results with emojis/markdown in Russian
 - UI-facing text and flag labels are in Russian
 
