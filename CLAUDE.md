@@ -83,8 +83,8 @@ All configuration is in-code (no config files):
 - Dropdown has two optgroups: **Top 20 Stocks by Market Cap** and **Popular Crypto** (BTC-USD, ETH-USD, SOL-USD, etc.)
 - The Fundamental card adapts its label and rows based on `asset_type` (Stock / ETF / Crypto)
 - Telegram: `tg_bot.py` calls `/analyze/{ticker}` and formats results with emojis/markdown in Russian
-- UI-facing text and flag labels are in Russian
-- Nav bar on both pages links between Анализ активов (`/`) and Портфель (`/portfolio`)
+- UI-facing text and flag labels are in English
+- Nav bar on both pages links between Asset Analysis (`/`) and Portfolio (`/portfolio`)
 
 ### Portfolio Calculator
 

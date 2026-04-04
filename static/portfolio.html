@@ -300,59 +300,59 @@
 </head>
 <body>
 
-<a class="logout-btn" href="/logout">Выйти</a>
+<a class="logout-btn" href="/logout">Sign out</a>
 
 <h1>AI <span>Investor</span></h1>
-<p class="subtitle">Калькулятор инвестиционного портфеля</p>
+<p class="subtitle">Investment Portfolio Calculator</p>
 
 <nav class="nav">
-  <a href="/">Анализ активов</a>
-  <a href="/portfolio" class="active">Портфель</a>
+  <a href="/">Asset Analysis</a>
+  <a href="/portfolio" class="active">Portfolio</a>
 </nav>
 
 <!-- ── Input form ──────────────────────────────────────────── -->
 <div class="form-card">
-  <h2>Параметры портфеля</h2>
+  <h2>Portfolio Parameters</h2>
 
   <div class="form-grid">
     <div class="field">
-      <label>Ежемесячная сумма ($)</label>
+      <label>Monthly Amount ($)</label>
       <input type="number" id="monthlyAmount" min="1" step="1" value="500" placeholder="500" />
     </div>
     <div class="field">
-      <label>Срок (месяцев)</label>
+      <label>Duration (months)</label>
       <input type="number" id="durationMonths" min="1" max="600" value="60" placeholder="60" />
     </div>
     <div class="field">
-      <label>Аналитических активов</label>
-      <input type="text" id="assetCount" value="18 активов" disabled style="color:#64748b;cursor:default;" />
+      <label>Analyzed Assets</label>
+      <input type="text" id="assetCount" value="18 assets" disabled style="color:#64748b;cursor:default;" />
     </div>
   </div>
 
-  <p style="font-size:.8rem;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.75rem;">Уровень риска</p>
+  <p style="font-size:.8rem;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.75rem;">Risk Level</p>
   <div class="risk-group">
     <div class="risk-card" data-risk="conservative">
       <div class="risk-icon">🛡️</div>
-      <div class="risk-name">Консервативный</div>
-      <div class="risk-desc">65% ETF, 35% акции<br>~7% год. доходность</div>
+      <div class="risk-name">Conservative</div>
+      <div class="risk-desc">65% ETF, 35% stocks<br>~7% annual return</div>
     </div>
     <div class="risk-card selected" data-risk="moderate">
       <div class="risk-icon">⚖️</div>
-      <div class="risk-name">Умеренный</div>
-      <div class="risk-desc">35% ETF, 55% акции, 10% крипто<br>~10% год. доходность</div>
+      <div class="risk-name">Moderate</div>
+      <div class="risk-desc">35% ETF, 55% stocks, 10% crypto<br>~10% annual return</div>
     </div>
     <div class="risk-card" data-risk="aggressive">
       <div class="risk-icon">🚀</div>
-      <div class="risk-name">Агрессивный</div>
-      <div class="risk-desc">15% ETF, 55% акции, 30% крипто<br>~15% год. доходность</div>
+      <div class="risk-name">Aggressive</div>
+      <div class="risk-desc">15% ETF, 55% stocks, 30% crypto<br>~15% annual return</div>
     </div>
   </div>
 
-  <button class="calc-btn" id="calcBtn" onclick="calculate()">Рассчитать портфель</button>
+  <button class="calc-btn" id="calcBtn" onclick="calculate()">Calculate Portfolio</button>
 </div>
 
 <!-- ── Spinner / error ─────────────────────────────────────── -->
-<div class="spinner" id="spinner">Анализируем активы, это может занять 30–60 секунд…</div>
+<div class="spinner" id="spinner">Analyzing assets, this may take 30–60 seconds…</div>
 <div class="error-box" id="errorBox"></div>
 
 <!-- ── Results ─────────────────────────────────────────────── -->
@@ -364,20 +364,20 @@
   <!-- Pie + Table -->
   <div class="results-grid">
     <div class="card">
-      <h3>Распределение активов</h3>
+      <h3>Asset Allocation</h3>
       <canvas id="pieChart" height="280"></canvas>
     </div>
     <div class="card">
-      <h3>Детали аллокации</h3>
+      <h3>Allocation Details</h3>
       <table class="alloc-table" id="allocTable">
         <thead>
           <tr>
-            <th>Тикер</th>
-            <th>Тип</th>
-            <th>Решение</th>
-            <th>Счёт</th>
+            <th>Ticker</th>
+            <th>Type</th>
+            <th>Decision</th>
+            <th>Score</th>
             <th style="text-align:right">%</th>
-            <th style="text-align:right">$/мес</th>
+            <th style="text-align:right">$/mo</th>
           </tr>
         </thead>
         <tbody id="allocBody"></tbody>
@@ -387,7 +387,7 @@
 
   <!-- Growth projection chart -->
   <div class="proj-card">
-    <h3>Прогноз роста портфеля</h3>
+    <h3>Portfolio Growth Projection</h3>
     <canvas id="lineChart" height="120"></canvas>
   </div>
 
@@ -427,8 +427,8 @@ async function calculate() {
   const monthly = parseFloat(document.getElementById('monthlyAmount').value);
   const months  = parseInt(document.getElementById('durationMonths').value);
 
-  if (!monthly || monthly <= 0) { showError('Введите корректную ежемесячную сумму.'); return; }
-  if (!months || months < 1 || months > 600) { showError('Срок должен быть от 1 до 600 месяцев.'); return; }
+  if (!monthly || monthly <= 0) { showError('Please enter a valid monthly amount.'); return; }
+  if (!months || months < 1 || months > 600) { showError('Duration must be between 1 and 600 months.'); return; }
 
   showSpinner(true);
   hideError();
@@ -444,12 +444,12 @@ async function calculate() {
     const res = await fetch('/portfolio/calculate', { method: 'POST', body: formData });
     if (!res.ok) {
       const err = await res.json();
-      throw new Error(err.detail || 'Ошибка сервера');
+      throw new Error(err.detail || 'Server error');
     }
     const data = await res.json();
     renderResults(data);
   } catch (e) {
-    showError('Ошибка: ' + e.message);
+    showError('Error: ' + e.message);
   } finally {
     showSpinner(false);
     document.getElementById('calcBtn').disabled = false;
@@ -461,24 +461,24 @@ function renderResults(data) {
   const { allocations, projection, summary } = data;
 
   /* Summary banner */
-  const risk_labels = { conservative: 'Консервативный', moderate: 'Умеренный', aggressive: 'Агрессивный' };
+  const risk_labels = { conservative: 'Conservative', moderate: 'Moderate', aggressive: 'Aggressive' };
   const risk_colors = { conservative: 'green', moderate: 'yellow', aggressive: 'red' };
   const rc = risk_colors[summary.risk_level] || 'blue';
   document.getElementById('summaryBanner').innerHTML = `
     <div class="sum-block">
-      <div class="label">Уровень риска</div>
+      <div class="label">Risk Level</div>
       <div class="value ${rc}">${risk_labels[summary.risk_level]}</div>
     </div>
     <div class="sum-block">
-      <div class="label">Инвестировано</div>
+      <div class="label">Total Invested</div>
       <div class="value blue">$${fmt(summary.total_invested)}</div>
     </div>
     <div class="sum-block">
-      <div class="label">Прогноз стоимости</div>
+      <div class="label">Projected Value</div>
       <div class="value green">$${fmt(summary.projected_value)}</div>
     </div>
     <div class="sum-block">
-      <div class="label">Ожидаемый доход</div>
+      <div class="label">Expected Gain</div>
       <div class="value green">+$${fmt(summary.expected_gain)}</div>
     </div>
     <div class="sum-block">
@@ -486,8 +486,8 @@ function renderResults(data) {
       <div class="value ${rc}">+${summary.roi_pct}%</div>
     </div>
     <div class="sum-block">
-      <div class="label">Год. доходность</div>
-      <div class="value yellow">${summary.annual_return_pct}% / год</div>
+      <div class="label">Annual Return</div>
+      <div class="value yellow">${summary.annual_return_pct}% / yr</div>
     </div>
   `;
 
@@ -545,7 +545,7 @@ function renderResults(data) {
       labels: months,
       datasets: [
         {
-          label: 'Стоимость портфеля',
+          label: 'Portfolio Value',
           data: values,
           borderColor: '#38bdf8',
           backgroundColor: '#38bdf820',
@@ -554,7 +554,7 @@ function renderResults(data) {
           pointRadius: projection.length > 60 ? 0 : 3,
         },
         {
-          label: 'Вложено',
+          label: 'Invested',
           data: invested,
           borderColor: '#64748b',
           backgroundColor: 'transparent',
@@ -569,7 +569,7 @@ function renderResults(data) {
         x: {
           ticks: { color: '#64748b', maxTicksLimit: 12 },
           grid:  { color: '#1e293b' },
-          title: { display: true, text: 'Месяцы', color: '#64748b' },
+          title: { display: true, text: 'Months', color: '#64748b' },
         },
         y: {
           ticks: { color: '#64748b', callback: v => '$' + fmt(v) },
