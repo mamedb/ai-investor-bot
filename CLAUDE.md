@@ -84,7 +84,8 @@ All configuration is in-code (no config files):
 - The Fundamental card adapts its label and rows based on `asset_type` (Stock / ETF / Crypto)
 - Telegram: `tg_bot.py` calls `/analyze/{ticker}` and formats results with emojis/markdown in Russian
 - UI-facing text and flag labels are in English
-- Nav bar on both pages links between Asset Analysis (`/`) and Portfolio Forecaster (`/portfolio`)
+- My Portfolio: `static/my_portfolio.html` served at `GET /my-portfolio`
+- Nav bar links all three pages: Asset Analysis (`/`), Portfolio Forecaster (`/portfolio`), My Portfolio (`/my-portfolio`)
 
 ### Portfolio Forecaster
 
@@ -115,9 +116,33 @@ Within each category, assets are weighted proportionally to their analysis score
 
 **Output JSON**: `{ allocations[], projection[], summary{} }` — rendered as doughnut pie chart, allocation table with decision badges, and a line chart showing portfolio value vs. invested over time.
 
+### My Portfolio
+
+`services/holdings_service.py` + `services/db_service.py` + `GET /my-portfolio` + CRUD routes.
+
+Tracks real holdings with live P&L. Data persisted in PostgreSQL.
+
+**Tables:**
+- `portfolio_holdings` — id, ticker, name, shares, avg_price, added_at
+- `portfolio_history` — id, total_value, total_cost, recorded_at (snapshot saved on each asset load)
+
+**Routes:**
+- `GET /my-portfolio/assets` — fetches live price via yfinance for each holding, returns enriched list + summary
+- `POST /my-portfolio/assets` — add holding (ticker, name, shares, avg_price)
+- `DELETE /my-portfolio/assets/{id}` — remove holding
+- `GET /my-portfolio/history` — last 90 days of value snapshots
+
+**UI features:**
+- Summary banner: Total Value / Total Invested / Gain-Loss / Return %
+- Holdings table: Ticker, Name, Shares, Avg Price, Current Price, Market Value, Gain/Loss, %, Delete
+- Add Asset form with dropdown (Top 20 Stocks, Popular ETFs, Crypto optgroups) + manual ticker fallback
+- Portfolio history line chart (Chart.js, last 90 days)
+
+`init_portfolio_tables()` called at server startup (safe if DB is down).
+
 ### Authentication
 
-Session-based login protects all routes (`/`, `/analyze/{ticker}`, `/history`, `/portfolio`, `/portfolio/calculate`).
+Session-based login protects all routes (`/`, `/analyze/{ticker}`, `/history`, `/portfolio`, `/portfolio/calculate`, `/my-portfolio`, `/my-portfolio/assets`, `/my-portfolio/history`).
 
 - `GET /login` — login page; redirects to `/` if already authenticated
 - `POST /login` — validates credentials from `LOGIN_USERNAME` / `LOGIN_PASSWORD` env vars; sets signed session cookie via `SessionMiddleware` (requires `itsdangerous`)

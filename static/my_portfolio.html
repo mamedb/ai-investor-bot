@@ -147,7 +147,7 @@
     /* Add form */
     .form-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr 1fr 1fr auto;
+      grid-template-columns: 1.4fr 1fr 1fr auto;
       gap: .75rem;
       align-items: end;
     }
@@ -161,7 +161,7 @@
       letter-spacing: .05em;
       margin-bottom: .3rem;
     }
-    .field input {
+    .field input, .field select {
       width: 100%;
       padding: .6rem .9rem;
       border-radius: 8px;
@@ -172,7 +172,19 @@
       outline: none;
       transition: border-color .2s;
     }
-    .field input:focus { border-color: #38bdf8; }
+    .field input:focus, .field select:focus { border-color: #38bdf8; }
+    .field select option, .field select optgroup { background: #1e293b; color: #f1f5f9; }
+    .ticker-input-wrap { position: relative; }
+    .ticker-manual {
+      margin-top: .4rem;
+      font-size: .78rem;
+      color: #64748b;
+    }
+    .ticker-manual input {
+      margin-top: .3rem;
+      padding: .45rem .7rem;
+      font-size: .85rem;
+    }
 
     .add-btn {
       padding: .62rem 1.3rem;
@@ -305,8 +317,59 @@
   <form id="addForm" onsubmit="addAsset(event)">
     <div class="form-grid">
       <div class="field">
-        <label>Ticker</label>
-        <input type="text" id="fTicker" placeholder="AAPL" maxlength="20" required style="text-transform:uppercase;" />
+        <label>Asset</label>
+        <select id="fSelect" onchange="onAssetSelect(this.value)">
+          <option value="">— Choose or type below —</option>
+          <optgroup label="Top Stocks">
+            <option value="AAPL|Apple">AAPL — Apple</option>
+            <option value="MSFT|Microsoft">MSFT — Microsoft</option>
+            <option value="NVDA|NVIDIA">NVDA — NVIDIA</option>
+            <option value="AMZN|Amazon">AMZN — Amazon</option>
+            <option value="GOOGL|Alphabet">GOOGL — Alphabet</option>
+            <option value="META|Meta Platforms">META — Meta Platforms</option>
+            <option value="TSLA|Tesla">TSLA — Tesla</option>
+            <option value="AVGO|Broadcom">AVGO — Broadcom</option>
+            <option value="BRK-B|Berkshire Hathaway">BRK-B — Berkshire Hathaway</option>
+            <option value="TSM|TSMC">TSM — TSMC</option>
+            <option value="WMT|Walmart">WMT — Walmart</option>
+            <option value="LLY|Eli Lilly">LLY — Eli Lilly</option>
+            <option value="JPM|JPMorgan Chase">JPM — JPMorgan Chase</option>
+            <option value="V|Visa">V — Visa</option>
+            <option value="UNH|UnitedHealth">UNH — UnitedHealth</option>
+            <option value="ORCL|Oracle">ORCL — Oracle</option>
+            <option value="XOM|ExxonMobil">XOM — ExxonMobil</option>
+            <option value="MA|Mastercard">MA — Mastercard</option>
+            <option value="COST|Costco">COST — Costco</option>
+            <option value="NFLX|Netflix">NFLX — Netflix</option>
+          </optgroup>
+          <optgroup label="Popular ETFs">
+            <option value="SPY|S&amp;P 500 ETF">SPY — S&amp;P 500 ETF</option>
+            <option value="QQQ|Nasdaq 100 ETF">QQQ — Nasdaq 100 ETF</option>
+            <option value="VTI|Total Market ETF">VTI — Total Market ETF</option>
+            <option value="AGG|Bond ETF">AGG — Bond ETF</option>
+            <option value="GLD|Gold ETF">GLD — Gold ETF</option>
+            <option value="VOO|Vanguard S&amp;P 500">VOO — Vanguard S&amp;P 500</option>
+            <option value="VIG|Dividend Growth ETF">VIG — Dividend Growth ETF</option>
+            <option value="SCHD|Dividend ETF">SCHD — Dividend ETF</option>
+          </optgroup>
+          <optgroup label="Crypto">
+            <option value="BTC-USD|Bitcoin">BTC-USD — Bitcoin</option>
+            <option value="ETH-USD|Ethereum">ETH-USD — Ethereum</option>
+            <option value="BNB-USD|BNB">BNB-USD — BNB</option>
+            <option value="SOL-USD|Solana">SOL-USD — Solana</option>
+            <option value="XRP-USD|XRP">XRP-USD — XRP</option>
+            <option value="ADA-USD|Cardano">ADA-USD — Cardano</option>
+            <option value="DOGE-USD|Dogecoin">DOGE-USD — Dogecoin</option>
+            <option value="AVAX-USD|Avalanche">AVAX-USD — Avalanche</option>
+            <option value="DOT-USD|Polkadot">DOT-USD — Polkadot</option>
+            <option value="LINK-USD|Chainlink">LINK-USD — Chainlink</option>
+          </optgroup>
+          <option value="__custom__|Other (type below)">✏️ Other — type manually</option>
+        </select>
+        <div class="ticker-manual" id="manualWrap" style="display:none;">
+          <input type="text" id="fTicker" placeholder="e.g. AMD" maxlength="20"
+                 style="text-transform:uppercase;" />
+        </div>
       </div>
       <div class="field">
         <label>Shares</label>
@@ -315,10 +378,6 @@
       <div class="field">
         <label>Avg Buy Price ($)</label>
         <input type="number" id="fAvgPrice" placeholder="150.00" min="0.0001" step="any" required />
-      </div>
-      <div class="field">
-        <label>Name (optional)</label>
-        <input type="text" id="fName" placeholder="Apple Inc." maxlength="200" />
       </div>
       <div>
         <button type="submit" class="add-btn" id="addBtn">Add to Portfolio</button>
@@ -466,19 +525,43 @@
     });
   }
 
+  /* ── Asset dropdown handler ───────────────────────────── */
+  function onAssetSelect(val) {
+    const manualWrap = $('manualWrap');
+    if (!val || val === '__custom__|Other (type below)') {
+      manualWrap.style.display = val === '__custom__|Other (type below)' ? '' : 'none';
+      if (val === '__custom__|Other (type below)') $('fTicker').value = '';
+      return;
+    }
+    const [ticker] = val.split('|');
+    manualWrap.style.display = 'none';
+    // Pre-fill shares/price hint — just show ticker in manual field for reference
+    $('fTicker').value = ticker;
+  }
+
+  /* Resolve ticker + name from form state */
+  function resolveAsset() {
+    const selVal = $('fSelect').value;
+    if (!selVal || selVal === '__custom__|Other (type below)') {
+      const t = ($('fTicker').value || '').trim().toUpperCase();
+      return { ticker: t, name: t };
+    }
+    const [ticker, name] = selVal.split('|');
+    return { ticker: ticker.trim(), name: (name || ticker).trim() };
+  }
+
   /* ── Add asset ────────────────────────────────────────── */
   async function addAsset(e) {
     e.preventDefault();
-    const ticker    = $('fTicker').value.trim().toUpperCase();
+    const { ticker, name } = resolveAsset();
     const shares    = parseFloat($('fShares').value);
     const avg_price = parseFloat($('fAvgPrice').value);
-    const name      = $('fName').value.trim();
 
     const msg = $('formMsg');
     msg.className = 'form-msg';
     msg.style.display = 'none';
 
-    if (!ticker) { showFormMsg('Ticker is required.', true); return; }
+    if (!ticker) { showFormMsg('Please select or type a ticker.', true); return; }
     if (!shares || shares <= 0) { showFormMsg('Shares must be positive.', true); return; }
     if (!avg_price || avg_price <= 0) { showFormMsg('Avg price must be positive.', true); return; }
 
@@ -495,6 +578,8 @@
       if (!res.ok) throw new Error(data.detail || 'Server error');
       showFormMsg(`${data.ticker} added successfully.`, false);
       $('addForm').reset();
+      $('fSelect').value = '';
+      $('manualWrap').style.display = 'none';
       loadAssets();
     } catch (err) {
       showFormMsg('Error: ' + err.message, true);
