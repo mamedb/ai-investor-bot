@@ -12,6 +12,7 @@ from services.decision_engine import decide as make_decision
 from services.db_service import save_result, get_history, add_holding, remove_holding, get_portfolio_history, init_portfolio_tables
 from services.portfolio_service import build_portfolio
 from services.holdings_service import get_live_portfolio
+from services.portfolio_forecast_service import get_forecast
 import os
 from typing import Optional
 
@@ -216,8 +217,8 @@ def my_portfolio_add(
         raise HTTPException(status_code=400, detail="ticker required")
     if shares <= 0 or avg_price <= 0:
         raise HTTPException(status_code=400, detail="shares and avg_price must be positive")
-    new_id = add_holding(ticker, name.strip() or ticker, shares, avg_price)
-    return JSONResponse(content={"id": new_id, "ticker": ticker})
+    holding_id, merged = add_holding(ticker, name.strip() or ticker, shares, avg_price)
+    return JSONResponse(content={"id": holding_id, "ticker": ticker, "merged": merged})
 
 
 @app.delete("/my-portfolio/assets/{holding_id}")
@@ -231,3 +232,12 @@ def my_portfolio_remove(holding_id: int, _auth=Depends(_require_auth)):
 @app.get("/my-portfolio/history")
 def my_portfolio_history(_auth=Depends(_require_auth)):
     return JSONResponse(content=get_portfolio_history(90))
+
+
+@app.post("/my-portfolio/forecast")
+def my_portfolio_forecast(_auth=Depends(_require_auth)):
+    portfolio = get_live_portfolio()
+    result = get_forecast(portfolio["holdings"], portfolio["summary"]["total_value"])
+    if "error" in result:
+        raise HTTPException(status_code=500, detail=result["error"])
+    return JSONResponse(content=result)

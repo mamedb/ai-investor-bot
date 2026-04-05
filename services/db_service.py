@@ -177,19 +177,43 @@ def init_portfolio_tables() -> None:
 
 
 def add_holding(ticker: str, name: str, shares: float, avg_price: float) -> int:
-    """Insert a new holding and return its id."""
+    """Insert a new holding or merge into an existing one (same ticker).
+
+    When the ticker already exists the shares are summed and avg_price is
+    recalculated as a weighted average:
+        new_avg = (old_shares * old_avg + new_shares * new_price) / total_shares
+    Returns the id of the affected row.
+    """
     conn = _get_conn()
     cur  = conn.cursor()
+
     cur.execute(
-        """
-        INSERT INTO portfolio_holdings (ticker, name, shares, avg_price)
-        VALUES (%s, %s, %s, %s)
-        RETURNING id
-        """,
-        (ticker, name, shares, avg_price),
+        "SELECT id, shares, avg_price FROM portfolio_holdings WHERE ticker = %s",
+        (ticker.upper(),),
     )
-    new_id = cur.fetchone()[0]
-    return new_id
+    existing = cur.fetchone()
+
+    if existing:
+        ex_id, ex_shares, ex_avg = existing
+        ex_shares = float(ex_shares)
+        ex_avg    = float(ex_avg)
+        total_shares = ex_shares + shares
+        new_avg      = (ex_shares * ex_avg + shares * avg_price) / total_shares
+        cur.execute(
+            "UPDATE portfolio_holdings SET shares = %s, avg_price = %s WHERE id = %s",
+            (total_shares, round(new_avg, 4), ex_id),
+        )
+        return ex_id, True
+    else:
+        cur.execute(
+            """
+            INSERT INTO portfolio_holdings (ticker, name, shares, avg_price)
+            VALUES (%s, %s, %s, %s)
+            RETURNING id
+            """,
+            (ticker.upper(), name, shares, avg_price),
+        )
+        return cur.fetchone()[0], False
 
 
 def remove_holding(holding_id: int) -> bool:

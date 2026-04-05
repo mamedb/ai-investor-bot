@@ -248,6 +248,88 @@
       color: #64748b;
       margin-bottom: 1rem;
     }
+
+    /* Forecast card */
+    .forecast-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+      gap: .6rem;
+    }
+    .forecast-header h3 { margin-bottom: 0; }
+    .forecast-btn {
+      padding: .45rem 1.1rem;
+      border-radius: 8px;
+      border: none;
+      background: #0ea5e9;
+      color: #fff;
+      font-size: .85rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    .forecast-btn:hover { background: #38bdf8; }
+    .forecast-btn:disabled { background: #334155; cursor: not-allowed; }
+
+    .forecast-rates {
+      display: flex;
+      gap: 1.5rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+    .rate-block { text-align: center; }
+    .rate-block .rl { font-size: .7rem; color: #64748b; text-transform: uppercase; letter-spacing: .05em; margin-bottom: .2rem; }
+    .rate-block .rv { font-size: 1.25rem; font-weight: 800; }
+    .rate-exp  { color: #38bdf8; }
+    .rate-opt  { color: #4ade80; }
+    .rate-pess { color: #fb923c; }
+
+    .forecast-rationale {
+      font-size: .82rem;
+      color: #94a3b8;
+      margin-bottom: 1rem;
+      line-height: 1.5;
+      border-left: 2px solid #334155;
+      padding-left: .75rem;
+    }
+
+    table.forecast {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .84rem;
+    }
+    table.forecast th {
+      text-align: right;
+      padding: .4rem .65rem;
+      color: #64748b;
+      font-size: .7rem;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      border-bottom: 1px solid #334155;
+      white-space: nowrap;
+    }
+    table.forecast th:first-child { text-align: center; }
+    table.forecast td {
+      padding: .5rem .65rem;
+      border-bottom: 1px solid #0f111740;
+      text-align: right;
+      white-space: nowrap;
+    }
+    table.forecast td:first-child { text-align: center; font-weight: 700; color: #94a3b8; }
+    table.forecast tr:last-child td { border-bottom: none; }
+    table.forecast tr:hover td { background: #0f111730; }
+    .fc-exp   { color: #38bdf8; font-weight: 600; }
+    .fc-opt   { color: #4ade80; }
+    .fc-pess  { color: #fb923c; }
+
+    .forecast-placeholder {
+      text-align: center;
+      padding: 2rem;
+      color: #475569;
+      font-size: .9rem;
+    }
   </style>
 </head>
 <body>
@@ -392,6 +474,17 @@
 <div class="chart-card" id="historyCard" style="display:none;">
   <h3>Portfolio Value History (90 days)</h3>
   <canvas id="historyChart" height="120"></canvas>
+</div>
+
+<!-- 10-Year Forecast -->
+<div class="card" id="forecastCard">
+  <div class="forecast-header">
+    <h3>10-Year Portfolio Forecast (AI)</h3>
+    <button class="forecast-btn" id="forecastBtn" onclick="loadForecast()">Run Forecast</button>
+  </div>
+  <div id="forecastContent">
+    <div class="forecast-placeholder">Click "Run Forecast" to get an AI-powered 10-year projection based on your current holdings.</div>
+  </div>
 </div>
 
 <script>
@@ -577,7 +670,10 @@
       const res = await fetch('/my-portfolio/assets', { method: 'POST', body: fd });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Server error');
-      showFormMsg(`${data.ticker} added successfully.`, false);
+      const msg = data.merged
+        ? `${data.ticker} position updated — shares and avg price recalculated.`
+        : `${data.ticker} added successfully.`;
+      showFormMsg(msg, false);
       $('addForm').reset();
       $('fSelect').value = '';
       $('manualWrap').style.display = 'none';
@@ -609,6 +705,84 @@
     const msg = $('formMsg');
     msg.textContent = text;
     msg.className = 'form-msg ' + (isError ? 'error' : 'ok');
+  }
+
+  /* ── 10-Year Forecast ────────────────────────────────── */
+  async function loadForecast() {
+    const btn = $('forecastBtn');
+    const content = $('forecastContent');
+    btn.disabled = true;
+    btn.textContent = 'Analyzing…';
+    content.innerHTML = '<div class="forecast-placeholder">Sending portfolio to AI — this may take a few seconds…</div>';
+
+    try {
+      const res = await fetch('/my-portfolio/forecast', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Forecast failed');
+      renderForecast(data);
+    } catch (err) {
+      content.innerHTML = `<div class="forecast-placeholder" style="color:#fca5a5;">Error: ${err.message}</div>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Re-run Forecast';
+    }
+  }
+
+  function renderForecast(data) {
+    const content = $('forecastContent');
+
+    const ratesHtml = `
+      <div class="forecast-rates">
+        <div class="rate-block">
+          <div class="rl">Expected (base)</div>
+          <div class="rv rate-exp">${data.expected_annual_return_pct.toFixed(1)}% / yr</div>
+        </div>
+        <div class="rate-block">
+          <div class="rl">Optimistic</div>
+          <div class="rv rate-opt">${data.optimistic_annual_return_pct.toFixed(1)}% / yr</div>
+        </div>
+        <div class="rate-block">
+          <div class="rl">Pessimistic</div>
+          <div class="rv rate-pess">${data.pessimistic_annual_return_pct.toFixed(1)}% / yr</div>
+        </div>
+      </div>`;
+
+    const rationaleHtml = data.rationale
+      ? `<div class="forecast-rationale">${data.rationale}</div>`
+      : '';
+
+    const rows = data.years.map(y => `
+      <tr>
+        <td>Year ${y.year}</td>
+        <td class="fc-pess">$${fmt(y.pessimistic_value)}</td>
+        <td class="fc-pess">${y.pessimistic_profit >= 0 ? '+' : ''}$${fmt(y.pessimistic_profit)}</td>
+        <td class="fc-exp">$${fmt(y.expected_value)}</td>
+        <td class="fc-exp">${y.expected_profit >= 0 ? '+' : ''}$${fmt(y.expected_profit)}</td>
+        <td class="fc-exp">${y.expected_return_pct >= 0 ? '+' : ''}${y.expected_return_pct}%</td>
+        <td class="fc-opt">$${fmt(y.optimistic_value)}</td>
+        <td class="fc-opt">${y.optimistic_profit >= 0 ? '+' : ''}$${fmt(y.optimistic_profit)}</td>
+      </tr>`).join('');
+
+    const tableHtml = `
+      <div class="table-wrap">
+        <table class="forecast">
+          <thead>
+            <tr>
+              <th>Year</th>
+              <th>Pessimistic Value</th>
+              <th>Pessimistic Profit</th>
+              <th>Expected Value</th>
+              <th>Expected Profit</th>
+              <th>Total Return</th>
+              <th>Optimistic Value</th>
+              <th>Optimistic Profit</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+
+    content.innerHTML = ratesHtml + rationaleHtml + tableHtml;
   }
 
   /* ── Init ─────────────────────────────────────────────── */
