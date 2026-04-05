@@ -79,18 +79,18 @@ All configuration is in-code (no config files):
 
 - Web GUI: `static/index.html` served at `GET /` by FastAPI
 - Login page: `static/login.html` served at `GET /login`
-- Portfolio Calculator: `static/portfolio.html` served at `GET /portfolio`
+- Portfolio Forecaster: `static/portfolio.html` served at `GET /portfolio`
 - Dropdown has two optgroups: **Top 20 Stocks by Market Cap** and **Popular Crypto** (BTC-USD, ETH-USD, SOL-USD, etc.)
 - The Fundamental card adapts its label and rows based on `asset_type` (Stock / ETF / Crypto)
 - Telegram: `tg_bot.py` calls `/analyze/{ticker}` and formats results with emojis/markdown in Russian
 - UI-facing text and flag labels are in English
-- Nav bar on both pages links between Asset Analysis (`/`) and Portfolio (`/portfolio`)
+- Nav bar on both pages links between Asset Analysis (`/`) and Portfolio Forecaster (`/portfolio`)
 
-### Portfolio Calculator
+### Portfolio Forecaster
 
 `services/portfolio_service.py` + `GET /portfolio` + `POST /portfolio/calculate`
 
-Inputs: monthly investment amount, duration (months), risk level (conservative / moderate / aggressive).
+Inputs: investment type (monthly / one-time), amount, hold period (months), risk level (conservative / moderate / aggressive).
 
 **Universe analyzed** (18 assets, fetched in parallel via `ThreadPoolExecutor`):
 - ETF: SPY, QQQ, VTI, AGG, GLD
@@ -107,8 +107,11 @@ Inputs: monthly investment amount, duration (months), risk level (conservative /
 
 Within each category, assets are weighted proportionally to their analysis score. If no asset clears the min-score threshold, the top-3 by score are used as a fallback.
 
-**Projection** uses standard compound-growth formula:  
-`FV = PMT × ((1+r)^n − 1) / r × (1+r)` where `r = annual_rate / 12`, `n = months`.
+**Projection** uses two formulas depending on investment type:
+- **Monthly DCA**: `FV = PMT × ((1+r)^n − 1) / r × (1+r)` (annuity due)
+- **One-Time**: `FV = PV × (1+r)^n` (compound growth of lump sum); projection anchors at month 0
+
+`r = annual_rate / 12`, `n = months`. OpenAI returns `expected_annual_return_pct`; fallback rates are 7/10/15% per risk level.
 
 **Output JSON**: `{ allocations[], projection[], summary{} }` — rendered as doughnut pie chart, allocation table with decision badges, and a line chart showing portfolio value vs. invested over time.
 

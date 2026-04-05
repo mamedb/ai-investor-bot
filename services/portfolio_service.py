@@ -127,18 +127,21 @@ def _analyze_universe() -> list[dict[str, Any]]:
 # ── AI allocation ────────────────────────────────────────────────────────────
 
 _PORTFOLIO_SYSTEM_PROMPT = """\
-You are a professional portfolio manager. You receive a list of analyzed assets \
+You are a professional portfolio manager. You receive a list of pre-analyzed assets \
 (with scores 0–18, decisions, and category) and a risk profile. Your job is to \
 select up to 10 assets for the portfolio and assign percentage allocations that \
 sum to exactly 100.
 
 Rules:
+- You are NOT limited to the pre-analyzed list. You may add any other real stock \
+or ETF ticker (e.g. VOO, IVV, SCHD, VIG, ARKK, AMD, CRWD, PLTR, TSM, ASML, etc.) \
+if it better fits the risk profile. Do not add crypto tickers not in the list.
 - Choose assets that best fit the risk profile — no fixed category quotas.
-- Higher score and stronger decision (STRONG_BUY > BUY > HOLD > AVOID) should generally mean higher allocation.
-- AVOID decisions should be excluded unless there are no better options.
-- For conservative: favor lower-volatility assets (ETFs, blue-chip stocks); minimize crypto.
-- For moderate: balanced growth-oriented mix; crypto is acceptable in small amounts.
-- For aggressive: growth stocks and crypto can receive significant allocations.
+- Higher score and stronger decision (STRONG_BUY > BUY > HOLD > AVOID) should get \
+more allocation. Pre-analyzed assets with AVOID should be excluded.
+- For conservative: favor low-volatility ETFs and dividend blue-chips; minimize crypto.
+- For moderate: balanced growth-oriented mix; small crypto allocation is acceptable.
+- For aggressive: growth stocks, sector ETFs, and crypto can have significant weight.
 - Estimate a realistic expected annual return percentage for the constructed portfolio.
 
 Return ONLY valid JSON:
@@ -179,7 +182,12 @@ def _ai_allocate(
 
     user_content = (
         f"Risk level: {risk_level}\n\n"
-        f"Analyzed assets:\n{json.dumps(summaries, indent=2)}"
+        f"Pre-analyzed assets (you may use some, all, or none of these — "
+        f"and you SHOULD add better-fit tickers not on this list if they suit the risk profile):\n"
+        f"{json.dumps(summaries, indent=2)}\n\n"
+        f"Remember: you are encouraged to include well-known tickers outside this list "
+        f"(e.g. VOO, SCHD, VIG, IVV, XLK, XLE, AMD, CRWD, PLTR, TSM, ASML, COIN, etc.) "
+        f"if they improve the portfolio for a {risk_level} investor."
     )
 
     model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
@@ -233,6 +241,7 @@ def build_portfolio(
     monthly_amount: float,
     duration_months: int,
     risk_level: str,
+    investment_type: str = "monthly",
 ) -> dict[str, Any]:
     """
     Main entry point. Analyzes the universe, calls OpenAI to pick up to 10
@@ -245,6 +254,22 @@ def build_portfolio(
 
     ai_allocs, annual_return_pct, reasoning = _ai_allocate(all_results, risk_level)
 
+    # Analyze any tickers OpenAI suggested that aren't in the universe
+    extra_tickers = [a["ticker"] for a in ai_allocs if a["ticker"] not in by_ticker]
+    if extra_tickers:
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            futures = {pool.submit(_analyze_one, t): t for t in extra_tickers}
+            for future in as_completed(futures):
+                t = futures[future]
+                try:
+                    res = future.result()
+                except Exception as exc:
+                    res = {"ticker": t, "error": str(exc), "score": 0, "decision": "AVOID"}
+                # Infer category from quote type
+                qt = res.get("quote_type", "STOCK")
+                res["_category"] = "crypto" if qt == "CRYPTOCURRENCY" else "etf" if qt == "ETF" else "stock"
+                by_ticker[t] = res
+
     # Renormalize to exactly 100%
     total_pct = sum(a["pct"] for a in ai_allocs) or 1
     for a in ai_allocs:
@@ -254,7 +279,7 @@ def build_portfolio(
     allocations: list[dict[str, Any]] = []
     for a in ai_allocs:
         asset = by_ticker.get(a["ticker"])
-        if not asset:
+        if not asset or "error" in asset:
             continue
         pct = a["pct"]
         allocations.append({
@@ -274,28 +299,48 @@ def build_portfolio(
     # ── Compound growth projection ───────────────────────────────────────────
     annual_rate  = annual_return_pct / 100
     monthly_rate = annual_rate / 12
+    is_onetime   = investment_type == "onetime"
 
     projection: list[dict] = []
+    if is_onetime:
+        # Anchor month 0 so the chart clearly shows the flat invested line
+        # from the moment the lump sum is deployed
+        projection.append({
+            "month":    0,
+            "value":    round(monthly_amount, 2),
+            "invested": round(monthly_amount, 2),
+        })
     for m in range(1, duration_months + 1):
-        if monthly_rate > 0:
-            fv = monthly_amount * ((1 + monthly_rate) ** m - 1) / monthly_rate * (1 + monthly_rate)
+        if is_onetime:
+            fv = monthly_amount * ((1 + monthly_rate) ** m) if monthly_rate > 0 else monthly_amount
+            invested_so_far = monthly_amount
         else:
-            fv = monthly_amount * m
+            if monthly_rate > 0:
+                fv = monthly_amount * ((1 + monthly_rate) ** m - 1) / monthly_rate * (1 + monthly_rate)
+            else:
+                fv = monthly_amount * m
+            invested_so_far = monthly_amount * m
         projection.append({
             "month":    m,
             "value":    round(fv, 2),
-            "invested": round(monthly_amount * m, 2),
+            "invested": round(invested_so_far, 2),
         })
 
-    total_invested  = monthly_amount * duration_months
+    total_invested  = monthly_amount if is_onetime else monthly_amount * duration_months
     projected_value = projection[-1]["value"] if projection else total_invested
     expected_gain   = projected_value - total_invested
+
+    # For one-time investments, alloc_usd is the lump-sum amount per asset
+    if is_onetime:
+        for a in allocations:
+            a["monthly_usd"] = round(monthly_amount * a["pct"] / 100, 2)
 
     return {
         "allocations": allocations,
         "projection":  projection,
         "summary": {
             "risk_level":            risk_level,
+            "investment_type":       investment_type,
             "monthly_amount":        monthly_amount,
             "duration_months":       duration_months,
             "annual_return_pct":     round(annual_return_pct, 1),

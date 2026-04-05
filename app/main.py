@@ -162,6 +162,7 @@ def portfolio_calculate(
     monthly_amount: float = Form(...),
     duration_months: int = Form(...),
     risk_level: str = Form(...),
+    investment_type: str = Form(default="monthly"),
     _auth=Depends(_require_auth),
 ):
     if risk_level not in ("conservative", "moderate", "aggressive"):
@@ -170,8 +171,10 @@ def portfolio_calculate(
         raise HTTPException(status_code=400, detail="monthly_amount must be positive")
     if not (1 <= duration_months <= 600):
         raise HTTPException(status_code=400, detail="duration_months must be 1–600")
+    if investment_type not in ("monthly", "onetime"):
+        raise HTTPException(status_code=400, detail="investment_type must be 'monthly' or 'onetime'")
     try:
-        result = build_portfolio(monthly_amount, duration_months, risk_level)
+        result = build_portfolio(monthly_amount, duration_months, risk_level, investment_type)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Portfolio calculation failed: {e}")
     return JSONResponse(content=result)

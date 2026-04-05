@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI Investor — Portfolio Calculator</title>
+  <title>AI Investor — Portfolio Forecaster</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -96,6 +96,27 @@
     }
     .field input:focus, .field select:focus { border-color: #38bdf8; }
     .field select option { background: #1e293b; }
+
+    /* Investment type toggle */
+    .inv-type-group {
+      display: flex;
+      gap: .5rem;
+      margin-bottom: 1.5rem;
+    }
+    .inv-type-btn {
+      flex: 1;
+      padding: .55rem 1rem;
+      border-radius: 8px;
+      border: 2px solid #334155;
+      background: transparent;
+      color: #94a3b8;
+      font-size: .9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: border-color .2s, color .2s, background .2s;
+    }
+    .inv-type-btn:hover { border-color: #475569; color: #f1f5f9; }
+    .inv-type-btn.selected { border-color: #38bdf8; background: #0ea5e920; color: #38bdf8; }
 
     /* Risk cards */
     .risk-group {
@@ -303,24 +324,29 @@
 <a class="logout-btn" href="/logout">Sign out</a>
 
 <h1>AI <span>Investor</span></h1>
-<p class="subtitle">Investment Portfolio Calculator</p>
+<p class="subtitle">Portfolio Forecaster</p>
 
 <nav class="nav">
   <a href="/">Asset Analysis</a>
-  <a href="/portfolio" class="active">Portfolio</a>
+  <a href="/portfolio" class="active">Portfolio Forecaster</a>
 </nav>
 
 <!-- ── Input form ──────────────────────────────────────────── -->
 <div class="form-card">
   <h2>Portfolio Parameters</h2>
 
+  <div class="inv-type-group">
+    <button class="inv-type-btn selected" data-type="monthly" onclick="setInvType(this)">Monthly Investment</button>
+    <button class="inv-type-btn" data-type="onetime" onclick="setInvType(this)">One-Time Investment</button>
+  </div>
+
   <div class="form-grid">
     <div class="field">
-      <label>Monthly Amount ($)</label>
+      <label id="amountLabel">Monthly Amount ($)</label>
       <input type="number" id="monthlyAmount" min="1" step="1" value="500" placeholder="500" />
     </div>
     <div class="field">
-      <label>Duration (months)</label>
+      <label id="durationLabel">Duration (months)</label>
       <input type="number" id="durationMonths" min="1" max="600" value="60" placeholder="60" />
     </div>
     <div class="field">
@@ -377,7 +403,7 @@
             <th>Decision</th>
             <th>Score</th>
             <th style="text-align:right">%</th>
-            <th style="text-align:right">$/mo</th>
+            <th style="text-align:right" id="allocAmtHeader">$/mo</th>
           </tr>
         </thead>
         <tbody id="allocBody"></tbody>
@@ -400,6 +426,17 @@
 </div>
 
 <script>
+/* ── Investment type selection ───────────────────────────── */
+function setInvType(btn) {
+  const type = btn.dataset.type;
+  document.querySelectorAll('.inv-type-btn').forEach(b => b.classList.toggle('selected', b === btn));
+  const isOnetime = type === 'onetime';
+  document.getElementById('amountLabel').textContent    = isOnetime ? 'Lump Sum Amount ($)' : 'Monthly Amount ($)';
+  document.getElementById('durationLabel').textContent  = isOnetime ? 'Hold Period (months)' : 'Duration (months)';
+  const hdr = document.getElementById('allocAmtHeader');
+  if (hdr) hdr.textContent = isOnetime ? 'Invested ($)' : '$/mo';
+}
+
 /* ── Risk card selection ─────────────────────────────────── */
 let selectedRisk = 'moderate';
 document.querySelectorAll('.risk-card').forEach(card => {
@@ -433,7 +470,7 @@ async function calculate() {
   const monthly = parseFloat(document.getElementById('monthlyAmount').value);
   const months  = parseInt(document.getElementById('durationMonths').value);
 
-  if (!monthly || monthly <= 0) { showError('Please enter a valid monthly amount.'); return; }
+  if (!monthly || monthly <= 0) { showError('Please enter a valid amount.'); return; }
   if (!months || months < 1 || months > 600) { showError('Duration must be between 1 and 600 months.'); return; }
 
   showSpinner(true);
@@ -441,10 +478,13 @@ async function calculate() {
   document.getElementById('results').classList.remove('active');
   document.getElementById('calcBtn').disabled = true;
 
+  const selectedInvType = document.querySelector('.inv-type-btn.selected')?.dataset.type || 'monthly';
+
   const formData = new FormData();
   formData.append('monthly_amount', monthly);
   formData.append('duration_months', months);
   formData.append('risk_level', selectedRisk);
+  formData.append('investment_type', selectedInvType);
 
   try {
     const res = await fetch('/portfolio/calculate', { method: 'POST', body: formData });
@@ -466,6 +506,12 @@ async function calculate() {
 function renderResults(data) {
   const { allocations, projection, summary } = data;
 
+  /* Sync form labels and column header with returned investment_type */
+  const isOnetimeSync = summary.investment_type === 'onetime';
+  document.getElementById('amountLabel').textContent    = isOnetimeSync ? 'Lump Sum Amount ($)' : 'Monthly Amount ($)';
+  document.getElementById('durationLabel').textContent  = isOnetimeSync ? 'Hold Period (months)' : 'Duration (months)';
+  document.getElementById('allocAmtHeader').textContent = isOnetimeSync ? 'Invested ($)' : '$/mo';
+
   /* AI reasoning */
   const reasoningCard = document.getElementById('reasoningCard');
   const reasoningText = document.getElementById('reasoningText');
@@ -480,14 +526,23 @@ function renderResults(data) {
   const risk_labels = { conservative: 'Conservative', moderate: 'Moderate', aggressive: 'Aggressive' };
   const risk_colors = { conservative: 'green', moderate: 'yellow', aggressive: 'red' };
   const rc = risk_colors[summary.risk_level] || 'blue';
+  const isOnetime = summary.investment_type === 'onetime';
+  const holdLabel  = isOnetime ? 'Hold Period' : 'Duration';
+  const holdValue  = summary.duration_months >= 12
+    ? `${Math.round(summary.duration_months / 12 * 10) / 10} yr`
+    : `${summary.duration_months} mo`;
   document.getElementById('summaryBanner').innerHTML = `
     <div class="sum-block">
-      <div class="label">Risk Level</div>
-      <div class="value ${rc}">${risk_labels[summary.risk_level]}</div>
+      <div class="label">Mode</div>
+      <div class="value ${isOnetime ? 'blue' : 'yellow'}">${isOnetime ? 'One-Time' : 'Monthly DCA'}</div>
     </div>
     <div class="sum-block">
-      <div class="label">Total Invested</div>
+      <div class="label">${isOnetime ? 'Lump Sum Invested' : 'Total Invested'}</div>
       <div class="value blue">$${fmt(summary.total_invested)}</div>
+    </div>
+    <div class="sum-block">
+      <div class="label">${holdLabel}</div>
+      <div class="value blue">${holdValue}</div>
     </div>
     <div class="sum-block">
       <div class="label">Projected Value</div>
@@ -550,6 +605,7 @@ function renderResults(data) {
   });
 
   /* Line chart */
+  const isOnetimeChart = summary.investment_type === 'onetime';
   const months = projection.map(p => p.month);
   const values = projection.map(p => p.value);
   const invested = projection.map(p => p.invested);
@@ -567,10 +623,10 @@ function renderResults(data) {
           backgroundColor: '#38bdf820',
           fill: true,
           tension: .4,
-          pointRadius: projection.length > 60 ? 0 : 3,
+          pointRadius: projection.length > 61 ? 0 : 3,
         },
         {
-          label: 'Invested',
+          label: isOnetimeChart ? 'Initial Investment' : 'Invested',
           data: invested,
           borderColor: '#64748b',
           backgroundColor: 'transparent',
