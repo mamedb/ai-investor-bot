@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Investor — My Portfolio</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 2rem 1rem 4rem;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 1.8rem;
+      font-weight: 700;
+      letter-spacing: .04em;
+      margin-bottom: .4rem;
+      color: #f8fafc;
+    }
+    h1 span { color: #38bdf8; }
+
+    .subtitle {
+      text-align: center;
+      color: #64748b;
+      font-size: .9rem;
+      margin-bottom: 2rem;
+    }
+
+    /* Nav */
+    .nav {
+      display: flex;
+      justify-content: center;
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+      font-size: .9rem;
+    }
+    .nav a {
+      color: #38bdf8;
+      text-decoration: none;
+      opacity: .75;
+      transition: opacity .2s;
+    }
+    .nav a:hover, .nav a.active { opacity: 1; font-weight: 600; }
+
+    /* Logout */
+    .logout-btn {
+      position: fixed;
+      top: 1rem; right: 1rem;
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #94a3b8;
+      padding: .4rem .8rem;
+      border-radius: 8px;
+      font-size: .8rem;
+      text-decoration: none;
+      transition: color .2s, border-color .2s;
+    }
+    .logout-btn:hover { color: #f1f5f9; border-color: #64748b; }
+
+    /* Summary banner */
+    .summary-banner {
+      max-width: 900px;
+      margin: 0 auto 1.5rem;
+      border-radius: 12px;
+      padding: 1.4rem 1.8rem;
+      background: #1e293b;
+      border: 1px solid #334155;
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .sum-block { flex: 1; min-width: 130px; }
+    .sum-block .label { font-size: .72rem; color: #64748b; text-transform: uppercase; letter-spacing: .05em; margin-bottom: .25rem; }
+    .sum-block .value { font-size: 1.5rem; font-weight: 800; }
+    .value-green  { color: #4ade80; }
+    .value-red    { color: #f87171; }
+    .value-blue   { color: #38bdf8; }
+
+    /* Card */
+    .card {
+      max-width: 900px;
+      margin: 0 auto 1.2rem;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 1.4rem;
+    }
+    .card h3 {
+      font-size: .8rem;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: #64748b;
+      margin-bottom: 1rem;
+    }
+
+    /* Holdings table */
+    .table-wrap { overflow-x: auto; }
+    table.holdings {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .85rem;
+    }
+    table.holdings th {
+      text-align: left;
+      padding: .45rem .7rem;
+      color: #64748b;
+      font-size: .72rem;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      border-bottom: 1px solid #334155;
+      white-space: nowrap;
+    }
+    table.holdings td {
+      padding: .55rem .7rem;
+      border-bottom: 1px solid #1e293b;
+      white-space: nowrap;
+      vertical-align: middle;
+    }
+    table.holdings tr:last-child td { border-bottom: none; }
+    table.holdings tr:hover td { background: #0f111740; }
+    .ticker-cell { font-weight: 700; color: #38bdf8; font-size: .9rem; }
+    .gain-pos { color: #4ade80; font-weight: 600; }
+    .gain-neg { color: #f87171; font-weight: 600; }
+    .empty-state { text-align: center; padding: 2.5rem; color: #475569; font-size: .9rem; }
+
+    /* Delete button */
+    .del-btn {
+      background: #450a0a;
+      border: 1px solid #991b1b;
+      color: #fca5a5;
+      border-radius: 20px;
+      padding: .15rem .55rem;
+      font-size: .75rem;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    .del-btn:hover { background: #7f1d1d; }
+
+    /* Add form */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr auto;
+      gap: .75rem;
+      align-items: end;
+    }
+    @media (max-width: 640px) { .form-grid { grid-template-columns: 1fr 1fr; } }
+
+    .field label {
+      display: block;
+      font-size: .75rem;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      margin-bottom: .3rem;
+    }
+    .field input {
+      width: 100%;
+      padding: .6rem .9rem;
+      border-radius: 8px;
+      border: 1px solid #334155;
+      background: #0f1117;
+      color: #f1f5f9;
+      font-size: .95rem;
+      outline: none;
+      transition: border-color .2s;
+    }
+    .field input:focus { border-color: #38bdf8; }
+
+    .add-btn {
+      padding: .62rem 1.3rem;
+      border-radius: 8px;
+      border: none;
+      background: #0ea5e9;
+      color: #fff;
+      font-size: .95rem;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background .2s;
+    }
+    .add-btn:hover { background: #38bdf8; }
+    .add-btn:disabled { background: #334155; cursor: not-allowed; }
+
+    /* Error / success inline */
+    .form-msg {
+      margin-top: .75rem;
+      font-size: .85rem;
+      display: none;
+    }
+    .form-msg.error { color: #fca5a5; display: block; }
+    .form-msg.ok    { color: #4ade80; display: block; }
+
+    /* Spinner */
+    .spinner {
+      display: none;
+      text-align: center;
+      margin: 2rem 0;
+      color: #94a3b8;
+      font-size: .9rem;
+    }
+    .spinner.active { display: block; }
+    .spinner::before {
+      content: '';
+      display: inline-block;
+      width: 24px; height: 24px;
+      border: 3px solid #334155;
+      border-top-color: #38bdf8;
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+      vertical-align: middle;
+      margin-right: .6rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* History chart card */
+    .chart-card {
+      max-width: 900px;
+      margin: 0 auto 1.2rem;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 1.4rem;
+    }
+    .chart-card h3 {
+      font-size: .8rem;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: #64748b;
+      margin-bottom: 1rem;
+    }
+  </style>
+</head>
+<body>
+
+<a class="logout-btn" href="/logout">Sign out</a>
+
+<h1>AI <span>Investor</span></h1>
+<p class="subtitle">My Portfolio</p>
+
+<nav class="nav">
+  <a href="/">Asset Analysis</a>
+  <a href="/portfolio">Portfolio Forecaster</a>
+  <a href="/my-portfolio" class="active">My Portfolio</a>
+</nav>
+
+<!-- Summary banner -->
+<div class="summary-banner" id="summaryBanner">
+  <div class="sum-block">
+    <div class="label">Total Value</div>
+    <div class="value value-green" id="sumValue">—</div>
+  </div>
+  <div class="sum-block">
+    <div class="label">Total Invested</div>
+    <div class="value value-blue" id="sumCost">—</div>
+  </div>
+  <div class="sum-block">
+    <div class="label">Total Gain / Loss</div>
+    <div class="value" id="sumGain">—</div>
+  </div>
+  <div class="sum-block">
+    <div class="label">Return %</div>
+    <div class="value" id="sumPct">—</div>
+  </div>
+</div>
+
+<!-- Spinner -->
+<div class="spinner" id="spinner">Loading portfolio…</div>
+
+<!-- Holdings table -->
+<div class="card">
+  <h3>Holdings</h3>
+  <div class="table-wrap">
+    <table class="holdings">
+      <thead>
+        <tr>
+          <th>Ticker</th>
+          <th>Name</th>
+          <th>Shares</th>
+          <th>Avg Price</th>
+          <th>Current Price</th>
+          <th>Market Value</th>
+          <th>Gain / Loss</th>
+          <th>%</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="holdingsBody">
+        <tr><td colspan="9" class="empty-state">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add Asset form -->
+<div class="card">
+  <h3>Add Asset</h3>
+  <form id="addForm" onsubmit="addAsset(event)">
+    <div class="form-grid">
+      <div class="field">
+        <label>Ticker</label>
+        <input type="text" id="fTicker" placeholder="AAPL" maxlength="20" required style="text-transform:uppercase;" />
+      </div>
+      <div class="field">
+        <label>Shares</label>
+        <input type="number" id="fShares" placeholder="10" min="0.000001" step="any" required />
+      </div>
+      <div class="field">
+        <label>Avg Buy Price ($)</label>
+        <input type="number" id="fAvgPrice" placeholder="150.00" min="0.0001" step="any" required />
+      </div>
+      <div class="field">
+        <label>Name (optional)</label>
+        <input type="text" id="fName" placeholder="Apple Inc." maxlength="200" />
+      </div>
+      <div>
+        <button type="submit" class="add-btn" id="addBtn">Add to Portfolio</button>
+      </div>
+    </div>
+    <div class="form-msg" id="formMsg"></div>
+  </form>
+</div>
+
+<!-- History chart -->
+<div class="chart-card" id="historyCard" style="display:none;">
+  <h3>Portfolio Value History (90 days)</h3>
+  <canvas id="historyChart" height="120"></canvas>
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  let historyChartInst = null;
+
+  function fmt(n) {
+    return Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function fmtDate(isoStr) {
+    const d = new Date(isoStr);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+
+  /* ── Load assets ──────────────────────────────────────── */
+  async function loadAssets() {
+    $('spinner').classList.add('active');
+    try {
+      const res = await fetch('/my-portfolio/assets');
+      if (!res.ok) throw new Error('Failed to load portfolio');
+      const data = await res.json();
+      renderSummary(data.summary);
+      renderHoldings(data.holdings);
+      loadHistory();
+    } catch (e) {
+      $('holdingsBody').innerHTML = `<tr><td colspan="9" class="empty-state" style="color:#fca5a5;">Error: ${e.message}</td></tr>`;
+    } finally {
+      $('spinner').classList.remove('active');
+    }
+  }
+
+  /* ── Render summary banner ────────────────────────────── */
+  function renderSummary(s) {
+    $('sumValue').textContent = '$' + fmt(s.total_value);
+    $('sumCost').textContent  = '$' + fmt(s.total_cost);
+
+    const gainEl = $('sumGain');
+    gainEl.textContent = (s.total_gain >= 0 ? '+$' : '-$') + fmt(Math.abs(s.total_gain));
+    gainEl.className = 'value ' + (s.total_gain >= 0 ? 'value-green' : 'value-red');
+
+    const pctEl = $('sumPct');
+    pctEl.textContent = (s.total_gain_pct >= 0 ? '+' : '') + s.total_gain_pct + '%';
+    pctEl.className = 'value ' + (s.total_gain_pct >= 0 ? 'value-green' : 'value-red');
+  }
+
+  /* ── Render holdings table ────────────────────────────── */
+  function renderHoldings(holdings) {
+    const tbody = $('holdingsBody');
+    if (!holdings.length) {
+      tbody.innerHTML = '<tr><td colspan="9" class="empty-state">No holdings yet. Add your first asset below.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = holdings.map(h => {
+      const gainCls = h.gain >= 0 ? 'gain-pos' : 'gain-neg';
+      const gainStr = (h.gain >= 0 ? '+$' : '-$') + fmt(Math.abs(h.gain));
+      const pctStr  = (h.gain_pct >= 0 ? '+' : '') + h.gain_pct + '%';
+      return `<tr>
+        <td class="ticker-cell">${h.ticker}</td>
+        <td style="color:#cbd5e1">${h.name}</td>
+        <td>${h.shares}</td>
+        <td>$${fmt(h.avg_price)}</td>
+        <td>${h.current_price ? '$' + fmt(h.current_price) : '<span style="color:#475569">N/A</span>'}</td>
+        <td style="font-weight:600">$${fmt(h.market_value)}</td>
+        <td class="${gainCls}">${gainStr}</td>
+        <td class="${gainCls}">${pctStr}</td>
+        <td><button class="del-btn" onclick="removeAsset(${h.id})">×</button></td>
+      </tr>`;
+    }).join('');
+  }
+
+  /* ── Load portfolio history ───────────────────────────── */
+  async function loadHistory() {
+    try {
+      const res = await fetch('/my-portfolio/history');
+      if (!res.ok) return;
+      const rows = await res.json();
+      if (!rows.length) { $('historyCard').style.display = 'none'; return; }
+      renderHistoryChart(rows);
+      $('historyCard').style.display = '';
+    } catch (_) {}
+  }
+
+  /* ── Render history chart ─────────────────────────────── */
+  function renderHistoryChart(rows) {
+    const labels  = rows.map(r => fmtDate(r.recorded_at));
+    const values  = rows.map(r => r.total_value);
+    const costs   = rows.map(r => r.total_cost);
+
+    if (historyChartInst) historyChartInst.destroy();
+    historyChartInst = new Chart($('historyChart'), {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Portfolio Value',
+            data: values,
+            borderColor: '#38bdf8',
+            backgroundColor: '#38bdf820',
+            fill: true,
+            tension: .4,
+            pointRadius: rows.length > 60 ? 0 : 3,
+          },
+          {
+            label: 'Invested',
+            data: costs,
+            borderColor: '#64748b',
+            backgroundColor: 'transparent',
+            borderDash: [5, 5],
+            tension: 0,
+            pointRadius: 0,
+          },
+        ]
+      },
+      options: {
+        scales: {
+          x: {
+            ticks: { color: '#64748b', maxTicksLimit: 12 },
+            grid:  { color: '#1e293b' },
+          },
+          y: {
+            ticks: { color: '#64748b', callback: v => '$' + Number(v).toLocaleString('en-US', { maximumFractionDigits: 0 }) },
+            grid:  { color: '#1e293b' },
+          },
+        },
+        plugins: {
+          legend: { labels: { color: '#94a3b8', font: { size: 11 } } },
+          tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: $${fmt(ctx.parsed.y)}` } },
+        },
+      }
+    });
+  }
+
+  /* ── Add asset ────────────────────────────────────────── */
+  async function addAsset(e) {
+    e.preventDefault();
+    const ticker    = $('fTicker').value.trim().toUpperCase();
+    const shares    = parseFloat($('fShares').value);
+    const avg_price = parseFloat($('fAvgPrice').value);
+    const name      = $('fName').value.trim();
+
+    const msg = $('formMsg');
+    msg.className = 'form-msg';
+    msg.style.display = 'none';
+
+    if (!ticker) { showFormMsg('Ticker is required.', true); return; }
+    if (!shares || shares <= 0) { showFormMsg('Shares must be positive.', true); return; }
+    if (!avg_price || avg_price <= 0) { showFormMsg('Avg price must be positive.', true); return; }
+
+    $('addBtn').disabled = true;
+    const fd = new FormData();
+    fd.append('ticker', ticker);
+    fd.append('shares', shares);
+    fd.append('avg_price', avg_price);
+    fd.append('name', name);
+
+    try {
+      const res = await fetch('/my-portfolio/assets', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Server error');
+      showFormMsg(`${data.ticker} added successfully.`, false);
+      $('addForm').reset();
+      loadAssets();
+    } catch (err) {
+      showFormMsg('Error: ' + err.message, true);
+    } finally {
+      $('addBtn').disabled = false;
+    }
+  }
+
+  /* ── Remove asset ─────────────────────────────────────── */
+  async function removeAsset(id) {
+    if (!confirm('Remove this holding?')) return;
+    try {
+      const res = await fetch(`/my-portfolio/assets/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const d = await res.json();
+        alert('Error: ' + (d.detail || 'Could not delete.'));
+        return;
+      }
+      loadAssets();
+    } catch (e) {
+      alert('Error: ' + e.message);
+    }
+  }
+
+  function showFormMsg(text, isError) {
+    const msg = $('formMsg');
+    msg.textContent = text;
+    msg.className = 'form-msg ' + (isError ? 'error' : 'ok');
+  }
+
+  /* ── Init ─────────────────────────────────────────────── */
+  loadAssets();
+</script>
+</body>
+</html>

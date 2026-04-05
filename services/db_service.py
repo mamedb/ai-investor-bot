@@ -151,6 +151,122 @@ def save_result(ticker: str, asset_type: str,
         logger.error("search_history: failed to save %s — %s", ticker, e)
 
 
+def init_portfolio_tables() -> None:
+    """Create portfolio tables if they don't exist."""
+    conn = _get_conn()
+    cur  = conn.cursor()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS portfolio_holdings (
+            id         SERIAL PRIMARY KEY,
+            ticker     VARCHAR(20)     NOT NULL,
+            name       VARCHAR(200),
+            shares     NUMERIC(18,6)   NOT NULL,
+            avg_price  NUMERIC(18,4)   NOT NULL,
+            added_at   TIMESTAMP       DEFAULT NOW()
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS portfolio_history (
+            id           SERIAL PRIMARY KEY,
+            total_value  NUMERIC(18,2),
+            total_cost   NUMERIC(18,2),
+            recorded_at  TIMESTAMP DEFAULT NOW()
+        )
+    """)
+    logger.info("portfolio tables initialized")
+
+
+def add_holding(ticker: str, name: str, shares: float, avg_price: float) -> int:
+    """Insert a new holding and return its id."""
+    conn = _get_conn()
+    cur  = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO portfolio_holdings (ticker, name, shares, avg_price)
+        VALUES (%s, %s, %s, %s)
+        RETURNING id
+        """,
+        (ticker, name, shares, avg_price),
+    )
+    new_id = cur.fetchone()[0]
+    return new_id
+
+
+def remove_holding(holding_id: int) -> bool:
+    """Delete a holding by id. Returns True if a row was deleted."""
+    conn = _get_conn()
+    cur  = conn.cursor()
+    cur.execute("DELETE FROM portfolio_holdings WHERE id = %s", (holding_id,))
+    return cur.rowcount > 0
+
+
+def get_holdings() -> list[dict]:
+    """Return all holdings as a list of dicts."""
+    try:
+        conn = _get_conn()
+        cur  = conn.cursor()
+        cur.execute(
+            "SELECT id, ticker, name, shares, avg_price, added_at FROM portfolio_holdings ORDER BY added_at ASC"
+        )
+        cols = [desc[0] for desc in cur.description]
+        rows = []
+        for row in cur.fetchall():
+            d = dict(zip(cols, row))
+            if d.get("added_at"):
+                d["added_at"] = d["added_at"].isoformat()
+            for k, v in d.items():
+                if hasattr(v, "__float__"):
+                    d[k] = float(v)
+            rows.append(d)
+        return rows
+    except Exception as e:
+        logger.error("get_holdings failed: %s", e)
+        return []
+
+
+def save_portfolio_snapshot(total_value: float, total_cost: float) -> None:
+    """Insert a snapshot into portfolio_history; silently logs on failure."""
+    try:
+        conn = _get_conn()
+        cur  = conn.cursor()
+        cur.execute(
+            "INSERT INTO portfolio_history (total_value, total_cost) VALUES (%s, %s)",
+            (total_value, total_cost),
+        )
+    except Exception as e:
+        logger.error("save_portfolio_snapshot failed: %s", e)
+
+
+def get_portfolio_history(days: int = 90) -> list[dict]:
+    """Return portfolio_history rows for the last `days` days, ordered by recorded_at asc."""
+    try:
+        conn = _get_conn()
+        cur  = conn.cursor()
+        cur.execute(
+            """
+            SELECT recorded_at, total_value, total_cost
+            FROM portfolio_history
+            WHERE recorded_at >= NOW() - (%s || ' days')::INTERVAL
+            ORDER BY recorded_at ASC
+            """,
+            (days,),
+        )
+        cols = [desc[0] for desc in cur.description]
+        rows = []
+        for row in cur.fetchall():
+            d = dict(zip(cols, row))
+            if d.get("recorded_at"):
+                d["recorded_at"] = d["recorded_at"].isoformat()
+            for k, v in d.items():
+                if hasattr(v, "__float__"):
+                    d[k] = float(v)
+            rows.append(d)
+        return rows
+    except Exception as e:
+        logger.error("get_portfolio_history failed: %s", e)
+        return []
+
+
 def get_history(limit: int = 50) -> list[dict]:
     """Return the most recent `limit` rows from search_history."""
     try:

@@ -9,12 +9,19 @@ from services.etf_analysis import analyze as etf_analysis
 from services.crypto_analysis import analyze as crypto_analysis
 from services.sentiment_analysis import analyze as sentiment_analysis
 from services.decision_engine import decide as make_decision
-from services.db_service import save_result, get_history
+from services.db_service import save_result, get_history, add_holding, remove_holding, get_portfolio_history, init_portfolio_tables
 from services.portfolio_service import build_portfolio
+from services.holdings_service import get_live_portfolio
 import os
 from typing import Optional
 
 app = FastAPI()
+
+try:
+    init_portfolio_tables()
+except Exception as _e:
+    import logging as _logging
+    _logging.getLogger(__name__).warning("init_portfolio_tables failed (DB may be down): %s", _e)
 
 _SECRET_KEY      = os.environ.get("SECRET_KEY", "change-me-in-production")
 _LOGIN_USERNAME  = os.environ.get("LOGIN_USERNAME", "admin")
@@ -178,3 +185,49 @@ def portfolio_calculate(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Portfolio calculation failed: {e}")
     return JSONResponse(content=result)
+
+
+@app.get("/my-portfolio")
+def my_portfolio_page(_auth=Depends(_require_auth)):
+    return FileResponse(
+        os.path.join(_static_dir, "my_portfolio.html"),
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
+
+
+@app.get("/my-portfolio/assets")
+def my_portfolio_assets(_auth=Depends(_require_auth)):
+    try:
+        return JSONResponse(content=get_live_portfolio())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/my-portfolio/assets")
+def my_portfolio_add(
+    ticker:    str   = Form(...),
+    shares:    float = Form(...),
+    avg_price: float = Form(...),
+    name:      str   = Form(default=""),
+    _auth=Depends(_require_auth),
+):
+    ticker = ticker.upper().strip()
+    if not ticker:
+        raise HTTPException(status_code=400, detail="ticker required")
+    if shares <= 0 or avg_price <= 0:
+        raise HTTPException(status_code=400, detail="shares and avg_price must be positive")
+    new_id = add_holding(ticker, name.strip() or ticker, shares, avg_price)
+    return JSONResponse(content={"id": new_id, "ticker": ticker})
+
+
+@app.delete("/my-portfolio/assets/{holding_id}")
+def my_portfolio_remove(holding_id: int, _auth=Depends(_require_auth)):
+    ok = remove_holding(holding_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="holding not found")
+    return JSONResponse(content={"deleted": holding_id})
+
+
+@app.get("/my-portfolio/history")
+def my_portfolio_history(_auth=Depends(_require_auth)):
+    return JSONResponse(content=get_portfolio_history(90))
