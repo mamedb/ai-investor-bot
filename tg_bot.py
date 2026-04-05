@@ -138,9 +138,16 @@ API_URL = os.getenv("API_URL", "http://127.0.0.1:8000/analyze/")
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    try:
+        from services.db_service import save_chat_id
+        save_chat_id(chat_id)
+    except Exception:
+        pass
     await update.message.reply_text(
         "👋 Привет! Пришли мне тикер (например, NVDA или VOO), "
-        "и я проанализирую его для долгосрочной стратегии."
+        "и я проанализирую его для долгосрочной стратегии.\n\n"
+        "✅ Этот чат зарегистрирован для получения алертов."
     )
 
 

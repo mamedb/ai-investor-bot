@@ -1,7 +1,13 @@
+import asyncio
+import os
+from contextlib import asynccontextmanager
+from typing import Optional
+
 from fastapi import FastAPI, HTTPException, Request, Form, Depends
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
+
 from services.data_service import get_stock_data
 from services.technical_analysis import analyze as technical_analysis
 from services.fundamental_analysis import analyze as fundamental_analysis
@@ -9,20 +15,35 @@ from services.etf_analysis import analyze as etf_analysis
 from services.crypto_analysis import analyze as crypto_analysis
 from services.sentiment_analysis import analyze as sentiment_analysis
 from services.decision_engine import decide as make_decision
-from services.db_service import save_result, get_history, add_holding, remove_holding, get_portfolio_history, init_portfolio_tables
+from services.db_service import (
+    save_result, get_history,
+    add_holding, remove_holding, get_portfolio_history, init_portfolio_tables,
+    init_alerts_tables, add_alert, get_all_alerts, remove_alert,
+)
 from services.portfolio_service import build_portfolio
 from services.holdings_service import get_live_portfolio
 from services.portfolio_forecast_service import get_forecast
-import os
-from typing import Optional
+from services.alert_service import alert_loop
 
-app = FastAPI()
 
-try:
-    init_portfolio_tables()
-except Exception as _e:
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     import logging as _logging
-    _logging.getLogger(__name__).warning("init_portfolio_tables failed (DB may be down): %s", _e)
+    _log = _logging.getLogger(__name__)
+    try:
+        init_portfolio_tables()
+    except Exception as _e:
+        _log.warning("init_portfolio_tables failed (DB may be down): %s", _e)
+    try:
+        init_alerts_tables()
+    except Exception as _e:
+        _log.warning("init_alerts_tables failed (DB may be down): %s", _e)
+    task = asyncio.create_task(alert_loop())
+    yield
+    task.cancel()
+
+
+app = FastAPI(lifespan=lifespan)
 
 _SECRET_KEY      = os.environ.get("SECRET_KEY", "change-me-in-production")
 _LOGIN_USERNAME  = os.environ.get("LOGIN_USERNAME", "admin")
@@ -241,3 +262,45 @@ def my_portfolio_forecast(_auth=Depends(_require_auth)):
     if "error" in result:
         raise HTTPException(status_code=500, detail=result["error"])
     return JSONResponse(content=result)
+
+
+# ── Alerts ────────────────────────────────────────────────────────────────────
+
+@app.get("/alerts")
+def alerts_page(_auth=Depends(_require_auth)):
+    return FileResponse(
+        os.path.join(_static_dir, "alerts.html"),
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
+
+
+@app.get("/alerts/list")
+def alerts_list(_auth=Depends(_require_auth)):
+    return JSONResponse(content=get_all_alerts())
+
+
+@app.post("/alerts")
+def alerts_create(
+    ticker:     str   = Form(...),
+    alert_type: str   = Form(...),
+    threshold:  float = Form(default=None),
+    _auth=Depends(_require_auth),
+):
+    ticker = ticker.upper().strip()
+    if not ticker:
+        raise HTTPException(status_code=400, detail="ticker required")
+    valid_types = ("price_below", "price_above", "buy_signal", "avoid_signal")
+    if alert_type not in valid_types:
+        raise HTTPException(status_code=400, detail=f"alert_type must be one of {valid_types}")
+    if alert_type in ("price_below", "price_above") and (threshold is None or threshold <= 0):
+        raise HTTPException(status_code=400, detail="threshold required and must be positive for price alerts")
+    alert_id = add_alert(ticker, alert_type, threshold)
+    return JSONResponse(content={"id": alert_id, "ticker": ticker, "alert_type": alert_type})
+
+
+@app.delete("/alerts/{alert_id}")
+def alerts_delete(alert_id: int, _auth=Depends(_require_auth)):
+    ok = remove_alert(alert_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="alert not found")
+    return JSONResponse(content={"deleted": alert_id})

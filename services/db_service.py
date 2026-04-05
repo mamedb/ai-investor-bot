@@ -291,6 +291,144 @@ def get_portfolio_history(days: int = 90) -> list[dict]:
         return []
 
 
+def init_alerts_tables() -> None:
+    """Create price_alerts and telegram_chats tables if they don't exist."""
+    try:
+        conn = _get_conn()
+        cur  = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS price_alerts (
+                id           SERIAL PRIMARY KEY,
+                ticker       VARCHAR(20)   NOT NULL,
+                alert_type   VARCHAR(20)   NOT NULL,
+                threshold    NUMERIC(18,4),
+                is_active    BOOLEAN       DEFAULT TRUE,
+                created_at   TIMESTAMP     DEFAULT NOW(),
+                triggered_at TIMESTAMP
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS telegram_chats (
+                chat_id    BIGINT PRIMARY KEY,
+                added_at   TIMESTAMP DEFAULT NOW()
+            )
+        """)
+        logger.info("alerts tables initialized")
+    except Exception as e:
+        logger.warning("init_alerts_tables failed (DB may be down): %s", e)
+
+
+def add_alert(ticker: str, alert_type: str, threshold: float = None) -> int:
+    """Insert a new alert. Returns the new id."""
+    conn = _get_conn()
+    cur  = conn.cursor()
+    cur.execute(
+        "INSERT INTO price_alerts (ticker, alert_type, threshold) VALUES (%s, %s, %s) RETURNING id",
+        (ticker.upper(), alert_type, threshold),
+    )
+    return cur.fetchone()[0]
+
+
+def get_all_alerts() -> list[dict]:
+    """Return all alerts ordered by created_at desc."""
+    try:
+        conn = _get_conn()
+        cur  = conn.cursor()
+        cur.execute(
+            "SELECT id, ticker, alert_type, threshold, is_active, created_at, triggered_at "
+            "FROM price_alerts ORDER BY created_at DESC"
+        )
+        cols = [desc[0] for desc in cur.description]
+        rows = []
+        for row in cur.fetchall():
+            d = dict(zip(cols, row))
+            for k in ("created_at", "triggered_at"):
+                if d.get(k):
+                    d[k] = d[k].isoformat()
+            if d.get("threshold") is not None:
+                d["threshold"] = float(d["threshold"])
+            rows.append(d)
+        return rows
+    except Exception as e:
+        logger.error("get_all_alerts failed: %s", e)
+        return []
+
+
+def get_active_alerts(alert_types: list = None) -> list[dict]:
+    """Return active alerts, optionally filtered by type list."""
+    try:
+        conn = _get_conn()
+        cur  = conn.cursor()
+        if alert_types:
+            placeholders = ",".join(["%s"] * len(alert_types))
+            cur.execute(
+                f"SELECT id, ticker, alert_type, threshold FROM price_alerts "
+                f"WHERE is_active = TRUE AND alert_type IN ({placeholders})",
+                alert_types,
+            )
+        else:
+            cur.execute(
+                "SELECT id, ticker, alert_type, threshold FROM price_alerts WHERE is_active = TRUE"
+            )
+        cols = [desc[0] for desc in cur.description]
+        rows = []
+        for row in cur.fetchall():
+            d = dict(zip(cols, row))
+            if d.get("threshold") is not None:
+                d["threshold"] = float(d["threshold"])
+            rows.append(d)
+        return rows
+    except Exception as e:
+        logger.error("get_active_alerts failed: %s", e)
+        return []
+
+
+def remove_alert(alert_id: int) -> bool:
+    """Delete an alert by id. Returns True if a row was deleted."""
+    conn = _get_conn()
+    cur  = conn.cursor()
+    cur.execute("DELETE FROM price_alerts WHERE id = %s", (alert_id,))
+    return cur.rowcount > 0
+
+
+def deactivate_alert(alert_id: int) -> None:
+    """Mark an alert triggered and inactive (one-shot behavior)."""
+    try:
+        conn = _get_conn()
+        cur  = conn.cursor()
+        cur.execute(
+            "UPDATE price_alerts SET is_active = FALSE, triggered_at = NOW() WHERE id = %s",
+            (alert_id,),
+        )
+    except Exception as e:
+        logger.error("deactivate_alert failed: %s", e)
+
+
+def save_chat_id(chat_id: int) -> None:
+    """Register a Telegram chat ID (upsert — safe to call repeatedly)."""
+    try:
+        conn = _get_conn()
+        cur  = conn.cursor()
+        cur.execute(
+            "INSERT INTO telegram_chats (chat_id) VALUES (%s) ON CONFLICT (chat_id) DO NOTHING",
+            (chat_id,),
+        )
+    except Exception as e:
+        logger.error("save_chat_id failed: %s", e)
+
+
+def get_telegram_chats() -> list:
+    """Return all registered Telegram chat IDs."""
+    try:
+        conn = _get_conn()
+        cur  = conn.cursor()
+        cur.execute("SELECT chat_id FROM telegram_chats")
+        return [row[0] for row in cur.fetchall()]
+    except Exception as e:
+        logger.error("get_telegram_chats failed: %s", e)
+        return []
+
+
 def get_history(limit: int = 50) -> list[dict]:
     """Return the most recent `limit` rows from search_history."""
     try:
